@@ -1,0 +1,4 @@
+pyswip==0.2.10
+PyYAML==6.0
+simpy==4.0.1
+swiplserver==1.0.2

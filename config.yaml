@@ -1,0 +1,10 @@
+placement_trigger : 0.6
+epochs : 100
+infrastructure_path: "./test_set/infrastructures/infrastructure_0.pl"
+applications:
+  #- path : path of application's Prolog definition
+  #  node_trigger : probability of node failure
+  #  link_trigger : probability of link failure
+  - path : ./test_set/applications/application_0.pl
+    node_trigger : 0
+    link_trigger : 0
