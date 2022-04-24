@@ -14,6 +14,10 @@ import config
 from orchestration.orchestrator import Orchestrator
 import logs
 
+def print_usage():
+    print("Usage:")
+    print("python3 main.py -c <config.yaml path>")
+
 
 def place(dictionary : dict, placement : dict):
     expression = dictionary['functor']
@@ -53,18 +57,16 @@ def place(dictionary : dict, placement : dict):
 
 def dipendenze(dictionary: dict, dependencies: dict, caller):
     expression = dictionary['functor']
-    #print(dependencies)
-    #print(expression)
+    
     if expression == 'fp':
         function : str = dictionary.get('args')[0]
-        #dependencies[function] = None
+        
         return function, function, expression
     elif expression == 'if':
         guard = dictionary.get('args')[0].get('args')[0]
         c11, c12, exp_type1 = dipendenze(dictionary.get('args')[1], dependencies, guard)
         c21, c22, exp_type2 = dipendenze(dictionary.get('args')[2], dependencies, guard)
-        #print("guard %s c1 %s c2 %s" % (guard, c1, c2))
-        #print("IF c11 %s c12 %s c21 %s c22 %s" % (c11, c12, c21, c22))
+        
         dependencies[guard] = caller
         dependencies[c11] = guard
         dependencies[c21] = guard
@@ -73,21 +75,15 @@ def dipendenze(dictionary: dict, dependencies: dict, caller):
     elif expression == 'par':
         c11, c12, exp_type1 = dipendenze(dictionary.get('args')[0][0], dependencies, caller)
         c21, c22, exp_type2 = dipendenze(dictionary.get('args')[0][1], dependencies, caller)
-        #dependencies[c11] = caller
-        #dependencies[c21] = caller
 
         return1 = (c11, c12) if exp_type1 not in ['fp', 'seq'] else c12
         return2 = (c21, c22) if exp_type2 not in ['fp', 'seq'] else c22
             
         return return1, return2, expression
-        #return (c11, c12) if c11 != c12 else c11, (c21, c22) if c21 != c22 else c21, expression
-        return c12, c22, expression
 
     elif expression == 'seq':
         c11, c12, exp_type1 = dipendenze(dictionary.get('args')[0], dependencies, caller)
         c21, c22, exp_type2 = dipendenze(dictionary.get('args')[1], dependencies, c12)
-        #print("SEQ c11 %s c12 %s c21 %s c22 %s" % (c11, c12, c21, c22))
-        
 
         if c21 not in dependencies and type(c21) is not tuple:
             if exp_type1 == 'seq':
@@ -108,7 +104,6 @@ def dipendenze(dictionary: dict, dependencies: dict, caller):
         return2 = (c21, c22) if exp_type2 != 'fp' else c22
             
         return return1, return2, expression
-        #return (c11, c12) if c11 != c12 else c11, (c21, c22) if c21 != c22 else c21
 
 
 def build_placement(prolog_placement : dict) -> dict[str, PlacedFunction] :
@@ -159,48 +154,64 @@ def take_decision(probability : float) -> bool:
 # Entry point of the simulator
 def main(argv):
 
-    logger = logs.get_logger()
+    # Setting up
 
+    # logging
+    logger = logs.get_logger() # TODO make it global??
+    logger.info("logger is ready...")
+
+    # define where SecFaas2Fog is
     secfaas2fog_folder = './SecFaas2Fog'
     secfaas2fog_abs_path = os.path.abspath(
         os.path.expanduser(os.path.expandvars(secfaas2fog_folder)))
 
-    # defaults .pl path
+    # define defaults Prolog files path
     placer_path = os.path.join(secfaas2fog_abs_path,'placer.pl')
     application_path = os.path.join(secfaas2fog_abs_path, 'application.pl')
     infrastructure_path = os.path.join(secfaas2fog_abs_path, 'infrastructure.pl')
 
     # statistical variables
+    # TODO improve
     # placement results is a list of objects like {start: time, end : time, success : bool}
     placement_results : list = []
 
-    # config path
+    # configuration file path
     config_path = None
+
+    # we should have 2 command line arguments
+    if len(argv) != 2:
+        print_usage()
+        return 1
 
     error = False
     # parse command line arguments
-    for i in range(0, len(argv)-1, 2):
+    for i in range(0, len(argv) - 1, 2):
         if error:
             break
         option = argv[i]
-        option_value = argv[i+1]
+        option_value = argv[i + 1]
         if (option == '-c'):
             # path of a valid config
             error = not os.path.isfile(option_value)
             config_path = option_value
-
-    if len(argv) != 2 or error:
-
-        print("Usage:")
-        print("python3 main.py -c <config.yaml path>")
-        return 0
     
-    parse_config(config_path)
+    if error:
+        print_usage()
+        return 1
+    
+    # parse the config file
+    config_has_parsed = parse_config(config_path)
+
+    if not config_has_parsed:
+        logger.critical("config parsing failed") # TODO devo stamparlo qui?
+        print_usage()
+        return 1
+
+    
 
     # save application and infrastructure files into default paths
     
     # TODO NOW WE HAVE ONLY 1 APP
-    #print(config.num_of_epochs)
     shutil.copy(config.applications[0], application_path)
     shutil.copy(config.infrastructure_temp_path, infrastructure_path)
 

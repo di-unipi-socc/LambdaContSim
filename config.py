@@ -28,10 +28,8 @@ def parse_config(path):
         
         applications = config['applications']
 
-        print(applications)
-        print(node_crash_probability)
-        print(link_crash_probability)
-
         # TODO check values
+
+        # TODO PRINT VALUES TO SHOW SUCCESS?
         
         return True
