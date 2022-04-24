@@ -135,17 +135,20 @@ def find_dependencies(prolog_placement: dict) -> dict[str, str]:
 
     _ = dipendenze(prolog_placement['Placement'], dependencies, None)
 
+    to_return = {}
+
     keys = dependencies.keys()
     for key in keys:
-        value = dependencies.get(key)
-        if type(value) is tuple:
-            new_value = unpack_nested_tuples(value)
-            dependencies[key] = new_value
-        else:
-            new_value = [value]
-            dependencies[key] = new_value
+        if type(key) is not tuple:
+            value = dependencies.get(key)
+            if type(value) is tuple:
+                new_value = unpack_nested_tuples(value)
+                to_return[key] = new_value
+            else:
+                new_value = [value]
+                to_return[key] = new_value
 
-    return dependencies
+    return to_return
 
 
 def take_decision(probability : float) -> bool:
@@ -205,7 +208,7 @@ def main(argv):
     # save application and infrastructure files into default paths
     
     # TODO NOW WE HAVE ONLY 1 APP
-    print(config.num_of_epochs)
+    #print(config.num_of_epochs)
     shutil.copy(config.applications[0]['path'], application_path)
     shutil.copy(config.infrastructure_temp_path, infrastructure_path)
 
@@ -257,7 +260,7 @@ def main(argv):
                 # discarding comments
                 other_lines.append(line)
         
-        print(other_lines)
+        #print(other_lines)
         #instance infrastructure
         infrastructure = Infrastructure(nodes, latencies, other_lines)
 

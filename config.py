@@ -12,7 +12,7 @@ def parse_config(path):
     with open(path, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-        print(config)
+        #print(config)
 
         placement_trigger_probability = config['placement_trigger']
         num_of_epochs = config['epochs']
