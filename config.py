@@ -4,7 +4,6 @@ import os
 def parse_config(path):
     
     # variabili globali nell'applicazione
-    global placement_trigger_probability
     global num_of_epochs
     global infrastructure_temp_path
     global node_crash_probability
@@ -16,7 +15,6 @@ def parse_config(path):
 
         #print(config)
 
-        placement_trigger_probability = config['placement_trigger']
         num_of_epochs = config['epochs']
         infrastructure_temp_path = config['infrastructure_path']
         node_crash_probability = config['node_crash_probability']
@@ -27,6 +25,12 @@ def parse_config(path):
             return False
         
         applications = config['applications']
+
+        # check that paths are correct
+        for app in applications:
+            if not os.path.isfile(app['path']):
+                # TODO log?
+                return False
 
         # TODO check values
 

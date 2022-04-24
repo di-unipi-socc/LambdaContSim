@@ -166,9 +166,9 @@ def main(argv):
         os.path.expanduser(os.path.expandvars(secfaas2fog_folder)))
 
     # define defaults Prolog files path
-    placer_path = os.path.join(secfaas2fog_abs_path,'placer.pl')
-    application_path = os.path.join(secfaas2fog_abs_path, 'application.pl')
-    infrastructure_path = os.path.join(secfaas2fog_abs_path, 'infrastructure.pl')
+    default_placer_path = os.path.join(secfaas2fog_abs_path,'placer.pl')
+    default_application_path = os.path.join(secfaas2fog_abs_path, 'application.pl')
+    default_infrastructure_path = os.path.join(secfaas2fog_abs_path, 'infrastructure.pl')
 
     # statistical variables
     # TODO improve
@@ -206,14 +206,12 @@ def main(argv):
         logger.critical("config parsing failed") # TODO devo stamparlo qui?
         print_usage()
         return 1
-
     
+    # get from config list of applications
+    applications = config.applications
 
-    # save application and infrastructure files into default paths
-    
-    # TODO NOW WE HAVE ONLY 1 APP
-    shutil.copy(config.applications[0], application_path)
-    shutil.copy(config.infrastructure_temp_path, infrastructure_path)
+    # save infrastructure file into default path
+    shutil.copy(config.infrastructure_temp_path, default_infrastructure_path)
 
     # instance infrastructure
     nodes : dict[str, Node] = {}
@@ -224,7 +222,7 @@ def main(argv):
 
     other_lines = []
 
-    with open(infrastructure_path) as f:
+    with open(default_infrastructure_path) as f:
         lines = f.readlines()
 
         for line in lines:
@@ -299,90 +297,70 @@ def main(argv):
 
     for index in range(0, config.num_of_epochs):
 
+        # for each application
+        for app in applications:
+            
+            # we want to trigger a new placement request?
+            trigger = take_decision(app['placement_trigger_probability'])
+            application_path = app['path']
 
-        # we want to trigger a new placement request?
-        trigger = take_decision(config.placement_trigger_probability)
+            if trigger:
+                # save application file into default path
+                shutil.copy(application_path, default_application_path)
 
-        # node crash
-        node_crashed = take_decision(config.node_crash_probability)
+                # try to place this app with SecFaas2Fog
 
-        node_resurrected = take_decision(config.node_crash_probability)
+                # it will reply with a valid placement iff application can be placed
+                placement = None
+                application_can_be_placed = False
+                start_time = datetime.now()
+                with PrologMQI(prolog_path_args=[
+                        "-s", default_placer_path
+                ]) as mqi:
+                    with mqi.create_thread() as prolog_thread:
+                        query = prolog_thread.query(secfaas2fog_command)
+                        end_time = datetime.now()
 
-        # link crash
-        link_crashed = take_decision(config.link_crash_probability)
-
-        link_resurrected = take_decision(config.link_crash_probability)
-
-        if (node_crashed):
-            print("NODE CRASH")
-            infrastructure.simulate_node_crash()
-        
-        elif node_resurrected:
-            print("NODE RESURRECT")
-            infrastructure.simulate_node_resurrection()
-        
-        if (link_crashed):
-            print("LINK CRASH")
-            infrastructure.simulate_link_crash()
-        
-        elif link_resurrected:
-            print("LINK RESURRECT")
-            infrastructure.simulate_link_resurrection()
-
-        if (trigger) :
-
-            # call secFaas2Fog
-            # it will reply with a valid placement iff application can be placed
-            placement = None
-            application_can_be_placed = False
-            start_time = datetime.now()
-            with PrologMQI(prolog_path_args=[
-                    "-s", placer_path
-            ]) as mqi:
-                with mqi.create_thread() as prolog_thread:
-                    query = prolog_thread.query(secfaas2fog_command)
-                    end_time = datetime.now()
-
-                    if isinstance(query, list):
-                        placement = query[0] # should be a dictionary
-                        #print(placement)
-
-                        # check if the placement is a dictionary
-                        if placement is not None and isinstance(placement, dict):
-                            function_chain = find_dependencies(placement)
-                            placement = build_placement(placement)
+                        if isinstance(query, list):
+                            placement = query[0] # should be a dictionary
                             #print(placement)
-                            #print(function_chain)
 
-                        application_can_be_placed = True
-                    else:
-                        print("Placement failed")
+                            # check if the placement is a dictionary
+                            if placement is not None and isinstance(placement, dict):
+                                function_chain = find_dependencies(placement)
+                                placement = build_placement(placement)
+                                #print(placement)
+                                #print(function_chain)
 
-            placement_data : dict = {
-                'start' : start_time,
-                'end' : end_time,
-                'success' : application_can_be_placed
-            }
+                            application_can_be_placed = True
+                        else:
+                            print("Placement failed")
 
-            placement_results.append(placement_data)
+                placement_data : dict = {
+                    'start' : start_time,
+                    'end' : end_time,
+                    'success' : application_can_be_placed
+                }
 
-            if (application_can_be_placed) :
-                pass
+                placement_results.append(placement_data)
 
-                # create application instance
-                # TODO actually we have 1 application so it is defined above
+                if (application_can_be_placed) :
+                    pass
 
-                # place application over the infrastructure (update nodes capabilities: memory, number of vCPUs )
-                functions = placement.keys()
-                for function in functions:
-                    node_id = placement[function].node_id
-                    node = nodes[node_id]
-                    #print("%s %s" % (function.id, node_id))
-                    node.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu) # TODO functions are not padded
+                    # create application instance
+                    # TODO actually we have 1 application so it is defined above
 
-                # launch application for a determined amount of time
-                thread = Orchestrator("Placement", 1000 + index, nodes, function_chain, placement)
-                thread.start()
+                    # place application over the infrastructure (update nodes capabilities: memory, number of vCPUs )
+                    functions = placement.keys()
+                    for function in functions:
+                        node_id = placement[function].node_id
+                        node = nodes[node_id]
+                        #print("%s %s" % (function.id, node_id))
+                        node.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu) # TODO functions are not padded
+
+                    # launch application for a determined amount of time
+                    thread = Orchestrator("Placement", 1000 + index, nodes, function_chain, placement)
+                    thread.start()
 
             # update infastructure.pl
             lines = []
@@ -421,9 +399,35 @@ def main(argv):
                         lines.append(latency_string)
 
             # overwrite file
-            with open(infrastructure_path, 'w') as f:
+            with open(default_infrastructure_path, 'w') as f:
                 for line in lines:
                     f.write(line)
+
+        # node crash
+        node_crashed = take_decision(config.node_crash_probability)
+
+        node_resurrected = take_decision(config.node_crash_probability)
+
+        # link crash
+        link_crashed = take_decision(config.link_crash_probability)
+
+        link_resurrected = take_decision(config.link_crash_probability)
+
+        if node_crashed:
+            print("NODE CRASH")
+            infrastructure.simulate_node_crash()
+        
+        elif node_resurrected:
+            print("NODE RESURRECT")
+            infrastructure.simulate_node_resurrection()
+        
+        if link_crashed:
+            print("LINK CRASH")
+            infrastructure.simulate_link_crash()
+        
+        elif link_resurrected:
+            print("LINK RESURRECT")
+            infrastructure.simulate_link_resurrection()
 
     # statistical prints
 
