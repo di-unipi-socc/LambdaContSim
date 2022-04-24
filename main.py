@@ -13,6 +13,7 @@ import shutil
 import math
 import config
 from orchestration.orchestrator import Orchestrator
+import logs
 
 
 def place(dictionary : dict, placement : dict):
@@ -162,6 +163,8 @@ def take_decision(probability : float) -> bool:
 # :param: trigger_prob probability of a new placement request
 # :param: num_of_epochs
 def main(argv):
+
+    logger = logs.get_logger()
 
     secfaas2fog_folder = './SecFaas2Fog'
     secfaas2fog_abs_path = os.path.abspath(
