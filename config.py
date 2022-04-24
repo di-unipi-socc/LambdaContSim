@@ -7,6 +7,8 @@ def parse_config(path):
     global placement_trigger_probability
     global num_of_epochs
     global infrastructure_temp_path
+    global node_crash_probability
+    global link_crash_probability
     global applications
 
     with open(path, 'r') as f:
@@ -17,23 +19,19 @@ def parse_config(path):
         placement_trigger_probability = config['placement_trigger']
         num_of_epochs = config['epochs']
         infrastructure_temp_path = config['infrastructure_path']
+        node_crash_probability = config['node_crash_probability']
+        link_crash_probability = config['link_crash_probability']
         
         
         if not os.path.isfile(infrastructure_temp_path):
             return False
         
-        applications = []
-        
-        applications_list = config['applications']
-        # applications
-        for app in applications_list:
-            if not os.path.isfile(app['path']):
-                return False
-            elem = {
-                'path' : app['path'],
-                'node_trigger' : app['node_trigger'],
-                'link_trigger' : app['link_trigger']
-            }
-            applications.append(elem)
+        applications = config['applications']
+
+        print(applications)
+        print(node_crash_probability)
+        print(link_crash_probability)
+
+        # TODO check values
         
         return True

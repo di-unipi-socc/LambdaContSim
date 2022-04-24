@@ -10,7 +10,6 @@ from application.function import PlacedFunction
 from math import inf
 import os
 import shutil
-import math
 import config
 from orchestration.orchestrator import Orchestrator
 import logs
@@ -158,10 +157,6 @@ def take_decision(probability : float) -> bool:
 
 
 # Entry point of the simulator
-# :param: application
-# :param: infrastructure
-# :param: trigger_prob probability of a new placement request
-# :param: num_of_epochs
 def main(argv):
 
     logger = logs.get_logger()
@@ -201,18 +196,12 @@ def main(argv):
         return 0
     
     parse_config(config_path)
-    
-    # TODO
-
-    # get config file from command line
-
-    # scan config file
 
     # save application and infrastructure files into default paths
     
     # TODO NOW WE HAVE ONLY 1 APP
     #print(config.num_of_epochs)
-    shutil.copy(config.applications[0]['path'], application_path)
+    shutil.copy(config.applications[0], application_path)
     shutil.copy(config.infrastructure_temp_path, infrastructure_path)
 
     # instance infrastructure
@@ -303,29 +292,29 @@ def main(argv):
         # we want to trigger a new placement request?
         trigger = take_decision(config.placement_trigger_probability)
 
-        # node crash trigger
-        node_crash_trigger = take_decision(0.2)
+        # node crash
+        node_crashed = take_decision(config.node_crash_probability)
 
-        node_resurrection_trigger = take_decision(0.2)
+        node_resurrected = take_decision(config.node_crash_probability)
 
-        # link crash trigger
-        link_crash_trigger = take_decision(0.3)
+        # link crash
+        link_crashed = take_decision(config.link_crash_probability)
 
-        link_resurrection_trigger = take_decision(0.3)
+        link_resurrected = take_decision(config.link_crash_probability)
 
-        if (node_crash_trigger):
+        if (node_crashed):
             print("NODE CRASH")
             infrastructure.simulate_node_crash()
         
-        elif node_resurrection_trigger:
+        elif node_resurrected:
             print("NODE RESURRECT")
             infrastructure.simulate_node_resurrection()
         
-        if (link_crash_trigger):
+        if (link_crashed):
             print("LINK CRASH")
             infrastructure.simulate_link_crash()
         
-        elif link_resurrection_trigger:
+        elif link_resurrected:
             print("LINK RESURRECT")
             infrastructure.simulate_link_resurrection()
 
