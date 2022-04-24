@@ -265,32 +265,7 @@ def main(argv):
         #instance infrastructure
         infrastructure = Infrastructure(nodes, latencies, other_lines)
 
-    # instance application TODO REMOVE
-    '''
-    functions: list[Function] = []
-    # TODO check errors on file opening
-    pattern = r'^functionReqs\(([^,]+),(\[.*?\]),\(([^,]+),([^,]+),([^\)]+)\),(\[.*?\])*'
-    with open(application_path) as f:
-        lines = f.readlines()
-
-        for line in lines:
-            if line.startswith('functionReqs'):
-                line = line.replace(' ', '')
-                #print(line)
-                match = re.match(pattern, line).groups()
-
-                function_id = match[0]
-                software_reqs = match[1].replace('[','').replace(']','').split(',')
-                memory = inf if match[2] == 'inf' else int(match[2])
-                v_cpu = inf if match[3] == 'inf' else int(match[3])
-                mhz = inf if match[4] == 'inf' else int(match[4])
-                # service requirements not read
-
-                function = Function(function_id, software_reqs, memory, v_cpu, mhz)
-                functions.append(function)
-    '''
-
-
+    
     # declare Prolog variable
     # once means that we take the first of the results
     secfaas2fog_command = "once(secfaas2fog(OrchestrationId, Placement))."
