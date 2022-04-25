@@ -1,6 +1,6 @@
 import logging
 
-def get_logger():
+def init_logger():
 
     # format the logging message
     # TIME - LOG LEVEL : message to print
@@ -9,7 +9,10 @@ def get_logger():
     # Creating an object
     logger = logging.getLogger()
  
-    # Setting the threshold of logger to DEBUG
+    # Setting the threshold of logger to INFO
     logger.setLevel(logging.INFO)
     
     return logger
+
+def get_logger():
+    return logging.getLogger()

@@ -13,10 +13,15 @@ import shutil
 import config
 from orchestration.orchestrator import Orchestrator
 import logs
+import logging
+
 
 def print_usage():
-    print("Usage:")
-    print("python3 main.py -c <config.yaml path>")
+    ''' Print application usage message'''
+    print('Usage: %s [<options>]' % os.path.basename(sys.argv[0]))
+    print('       %s [-h|--help] to show this help message' % os.path.basename(sys.argv[0]))
+    print('\nOptions:')
+    print('-c <config file> application config (default config.yaml)')
 
 
 def place(dictionary : dict, placement : dict, is_guard : bool):
@@ -200,11 +205,10 @@ def main(argv):
     # Setting up
 
     # logging
-    logger = logs.get_logger() # TODO make it global??
-    logger.info("logger is ready...")
+    logger = logs.init_logger() # TODO make it global??
 
     # define where SecFaas2Fog is
-    secfaas2fog_folder = './SecFaas2Fog'
+    secfaas2fog_folder = os.path.join(os.curdir,'SecFaas2Fog')
     secfaas2fog_abs_path = os.path.abspath(
         os.path.expanduser(os.path.expandvars(secfaas2fog_folder)))
 
@@ -213,42 +217,65 @@ def main(argv):
     default_application_path = os.path.join(secfaas2fog_abs_path, 'application.pl')
     default_infrastructure_path = os.path.join(secfaas2fog_abs_path, 'infrastructure.pl')
 
+    # define default config path
+    default_config_path = os.path.join(os.curdir,'config.yaml')
+
     # statistical variables
     applications_stats : dict = {}
     node_events : list = []
     link_events : list = []
 
-    # configuration file path
-    config_path = None
+    # configuration file path, set to default
+    config_path = default_config_path
 
-    # we should have 2 command line arguments
-    if len(argv) != 2:
+    # if the user use ask for help, print application usage message
+    if ('-h' in argv or '--help' in argv):
+        print_usage()
+        return 0
+
+    # we should have 0 or at most 2 command line arguments (-c config)
+    if len(argv) not in [0, 2]:
         print_usage()
         return 1
 
-    error = False
     # parse command line arguments
     for i in range(0, len(argv) - 1, 2):
-        if error:
-            break
+        
         option = argv[i]
         option_value = argv[i + 1]
+        
         if (option == '-c'):
-            # path of a valid config
-            error = not os.path.isfile(option_value)
+            # save into config_path variable
             config_path = option_value
+        else:
+            # unknown option
+            logger.info("Unknown %s option", option)
     
-    if error:
-        print_usage()
-        return 1
+    # check if the path is a file
+    if not os.path.exists(config_path) or not os.path.isfile(config_path):
+        logger.error("Config path '%s' not exists or is not a file" % config_path)
+        logger.info("Fallback to default config file %s" % default_config_path)
+        config_path = default_config_path
+        # check that the default config exists
+        if not os.path.exists(config_path) or not os.path.isfile(config_path):
+            logger.critical("Default config path '%s' not exists or is not a file, exit..." % config_path)
+            print_usage()
+            return 1
     
     # parse the config file
     config_has_parsed = parse_config(config_path)
 
     if not config_has_parsed:
-        logger.critical("config parsing failed") # TODO devo stamparlo qui?
+        logger.critical("Config parsing failed") # TODO devo stamparlo qui?
         print_usage()
         return 1
+    else:
+        logger.info("Config correctly parsed")
+    
+    # If silent mode is active don't show info messages but only errors and criticals
+    if(config.silent_mode):
+        logger.info("Silent mode is now active")
+        logger.setLevel(logging.ERROR)
     
     # get from config list of applications
     applications = config.applications
@@ -401,11 +428,12 @@ def main(argv):
                         functions = placement.keys()
                         for function in functions:
                             node_id = placement[function].node_id
-                            node = nodes[node_id]
-                            #print("%s %s" % (function.id, node_id))
-                            node.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu) # TODO functions are not padded
+                            node_obj = nodes[node_id]
+                            
+                            # take resources from the node
+                            node_obj.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu)
 
-                        # launch application for a determined amount of time
+                        # launch application
                         thread = Orchestrator("Placement", 1000 + index, nodes, function_chain, placement)
                         thread.start()
 
@@ -487,6 +515,8 @@ def main(argv):
 
     # statistical prints
 
+    logger.info("--- STATISTICS ---")
+
     global_number_of_placements = 0 # total number of placements (for all applications)
     global_successes = 0
     global_sum = 0
@@ -532,17 +562,19 @@ def main(argv):
         'data' : applications_stats
     }
 
-    print("Number of placements: %d" % global_number_of_placements)
-    print("Average time of SecFaas2Fog placement: " + str(float(f'{global_sum/global_number_of_placements:.2f}')) + " milliseconds")
-    print("Successess: %d" % global_successes)
+    logger.info("Number of placements: %d" % global_number_of_placements)
+    logger.info("Average time of SecFaas2Fog placement: " + str(float(f'{global_sum/global_number_of_placements:.2f}')) + " milliseconds")
+    logger.info("Successess: %d" % global_successes)
 
-    print("Writing report file...")
+    logger.info("Writing JSON's execution report on '%s'", config.report_output_file)
 
     # TODO MAKE IT COMMAND ARG
-    with open("stats.json", 'w') as file:
+    with open(config.report_output_file, 'w') as file:
         json.dump(stats_to_dump, indent = 4, default = str, fp = file)
 
-    print("Done!")
+    logger.info("Work done! Byee :)")
+
+    return 0
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+output_file : './report.json'
+silent_mode : false
 epochs : 100
 infrastructure_path: "./test_set/infrastructures/infrastructure_0.pl"
 node_crash_probability : 0.05
