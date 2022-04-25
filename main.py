@@ -19,7 +19,7 @@ def print_usage():
     print("python3 main.py -c <config.yaml path>")
 
 
-def place(dictionary : dict, placement : dict):
+def place(dictionary : dict, placement : dict, is_guard : bool):
     expression = dictionary['functor']
     if expression == 'fp':
         function_id = dictionary.get('args')[0]
@@ -29,27 +29,27 @@ def place(dictionary : dict, placement : dict):
         memory_req = hw_reqs.get('args')[0]
         v_cpu_req = hw_reqs.get('args')[1].get('args')[0]
         mhz_req = hw_reqs.get('args')[1].get('args')[1]
-        function = PlacedFunction(function_id, node_id, sw_reqs, memory_req, v_cpu_req, mhz_req)
+        function = PlacedFunction(function_id, node_id, sw_reqs, memory_req, v_cpu_req, mhz_req, is_guard)
         return { 
             function_id : function
         }
     elif expression == 'if':
-        guard = place(dictionary.get('args')[0], placement)
-        c1 = place(dictionary.get('args')[1], placement)
-        c2 = place(dictionary.get('args')[2], placement)
+        guard = place(dictionary.get('args')[0], placement, True)
+        c1 = place(dictionary.get('args')[1], placement, False)
+        c2 = place(dictionary.get('args')[2], placement, False)
         placement.update(guard)
         placement.update(c1)
         placement.update(c2)
         return placement
     elif expression == 'par':
-        c1 = place(dictionary.get('args')[0][0], placement)
-        c2 = place(dictionary.get('args')[0][1], placement)
+        c1 = place(dictionary.get('args')[0][0], placement, False)
+        c2 = place(dictionary.get('args')[0][1], placement, False)
         placement.update(c1)
         placement.update(c2)
         return placement
     elif expression == 'seq':
-        c1 = place(dictionary.get('args')[0], placement)
-        c2 = place(dictionary.get('args')[1], placement)
+        c1 = place(dictionary.get('args')[0], placement, False)
+        c2 = place(dictionary.get('args')[1], placement, False)
         placement.update(c1)
         placement.update(c2)
         return placement
@@ -109,7 +109,7 @@ def dipendenze(dictionary: dict, dependencies: dict, caller):
 def build_placement(prolog_placement : dict) -> dict[str, PlacedFunction] :
     orchestration_id = prolog_placement["OrchestrationId"] # TODO facci qualcosa
 
-    return place(prolog_placement['Placement'], {})
+    return place(prolog_placement['Placement'], {}, False)
 
 def unpack_nested_tuples(t: tuple):
     elements = list(t)

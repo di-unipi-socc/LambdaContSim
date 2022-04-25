@@ -25,6 +25,10 @@ class FunctionProcess:
 
         print("%s finished" % self.fun.id)
 
+        # TODO REMOVE
+        if(self.fun.is_guard):
+            print("%s is guard" % self.fun.id)
+
         functions_name : list = get_ready_functions(self.chain)
         # delete from chain
         # TODO RIVEDI

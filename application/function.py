@@ -5,16 +5,18 @@ class PlacedFunction:
     node_id = "" # node where the function has been deployed
     software_requirements: list[str] = []  # list of software reqs
     # hardware reqs
-    memory: int = 0
-    v_cpu: int = 0
-    mhz: int = 0
+    memory : int = 0
+    v_cpu : int = 0
+    mhz : int = 0
     time_of_execution = 1 # number of epochs TODO parameterize
-    # service_reqs
+    # is a guard of a conditional state?
+    is_guard : bool = False
 
-    def __init__(self, function_id: str, node_id : str, sw_reqs: list[str], memory: int, v_cpu: int, mhz: int):
+    def __init__(self, function_id: str, node_id : str, sw_reqs: list[str], memory: int, v_cpu: int, mhz: int, is_guard : bool):
         self.id = function_id
         self.node_id = node_id
         self.software_requirements = sw_reqs
         self.memory = memory
         self.v_cpu = v_cpu
         self.mhz = mhz
+        self.is_guard = is_guard
