@@ -150,6 +150,49 @@ def take_decision(probability : float) -> bool:
 
     return random.random() < probability
 
+# TODO commenta
+def update_infrastructure(infrastructure : Infrastructure, output_filename: str):
+    lines = []
+
+    nodes = infrastructure.nodes
+
+    nodes_keys = nodes.keys()
+    for key in nodes_keys:
+        node = nodes[key]
+        # if the node is not available, don't write it
+        if node.available:
+            node_string = "node(" + node.id + ", " + node.provider + ", ["
+            for sec_cap in node.security_capabilites:
+                node_string += sec_cap + ","
+            node_string = node_string.removesuffix(",")
+            node_string += "], ["
+            for sw_cap in node.software_capabilites:
+                node_string += sw_cap + ","
+            node_string = node_string.removesuffix(",")
+            node_string += "], (" + str(node.memory) + "," + str(node.v_cpu) + "," + str(node.mhz) + ")).\n"
+            #print(node_string)
+            lines.append(node_string)
+
+    # write non-saved data into file
+    for line in infrastructure.other_data:
+        lines.append(line)
+    
+    # write latencies informations
+    first_keys = infrastructure.latencies.keys()
+    for f_key in first_keys:
+        first_key_links = infrastructure.latencies.get(f_key).keys()
+        for s_key in first_key_links:
+            latency = infrastructure.latencies.get(f_key).get(s_key)['latency']
+            available = infrastructure.latencies.get(f_key).get(s_key)['available']
+            # write iff link is available
+            if available:
+                latency_string = 'latency(' + f_key + ', ' + s_key + ', ' + str(latency) + ').\n'
+                lines.append(latency_string)
+
+    # overwrite file
+    with open(output_filename, 'w') as f:
+        for line in lines:
+            f.write(line)
 
 # Entry point of the simulator
 def main(argv):
@@ -272,6 +315,8 @@ def main(argv):
 
     for index in range(0, config.num_of_epochs):
 
+        # PLACEMENT PHASE
+
         # for each application
         for app in applications:
             
@@ -338,45 +383,9 @@ def main(argv):
                     thread.start()
 
             # update infastructure.pl
-            lines = []
+            update_infrastructure(infrastructure, default_infrastructure_path)
 
-            nodes_keys = nodes.keys()
-            for key in nodes_keys:
-                node = nodes[key]
-                # if the node is not available, don't write it
-                if node.available:
-                    node_string = "node(" + node.id + ", " + node.provider + ", ["
-                    for sec_cap in node.security_capabilites:
-                        node_string += sec_cap + ","
-                    node_string = node_string.removesuffix(",")
-                    node_string += "], ["
-                    for sw_cap in node.software_capabilites:
-                        node_string += sw_cap + ","
-                    node_string = node_string.removesuffix(",")
-                    node_string += "], (" + str(node.memory) + "," + str(node.v_cpu) + "," + str(node.mhz) + ")).\n"
-                    #print(node_string)
-                    lines.append(node_string)
-
-            # write non-saved data into file
-            for line in infrastructure.other_data:
-                lines.append(line)
-            
-            # write latencies informations
-            first_keys = infrastructure.latencies.keys()
-            for f_key in first_keys:
-                first_key_links = infrastructure.latencies.get(f_key).keys()
-                for s_key in first_key_links:
-                    latency = infrastructure.latencies.get(f_key).get(s_key)['latency']
-                    available = infrastructure.latencies.get(f_key).get(s_key)['available']
-                    # write iff link is available
-                    if available:
-                        latency_string = 'latency(' + f_key + ', ' + s_key + ', ' + str(latency) + ').\n'
-                        lines.append(latency_string)
-
-            # overwrite file
-            with open(default_infrastructure_path, 'w') as f:
-                for line in lines:
-                    f.write(line)
+        # CRASH PHASE
 
         # node crash
         node_crashed = take_decision(config.node_crash_probability)
@@ -403,6 +412,9 @@ def main(argv):
         elif link_resurrected:
             print("LINK RESURRECT")
             infrastructure.simulate_link_resurrection()
+        
+        # update infastructure.pl
+        update_infrastructure(infrastructure, default_infrastructure_path)
 
     # statistical prints
 
