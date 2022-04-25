@@ -24,7 +24,7 @@ def print_usage():
     print('-c <config file> application config (default config.yaml)')
 
 
-def place(dictionary : dict, placement : dict, is_guard : bool):
+def rec_parse_placement(dictionary : dict, placement : dict, is_guard : bool):
     expression = dictionary['functor']
     if expression == 'fp':
         function_id = dictionary.get('args')[0]
@@ -39,28 +39,28 @@ def place(dictionary : dict, placement : dict, is_guard : bool):
             function_id : function
         }
     elif expression == 'if':
-        guard = place(dictionary.get('args')[0], placement, True)
-        c1 = place(dictionary.get('args')[1], placement, False)
-        c2 = place(dictionary.get('args')[2], placement, False)
+        guard = rec_parse_placement(dictionary.get('args')[0], placement, True)
+        c1 = rec_parse_placement(dictionary.get('args')[1], placement, False)
+        c2 = rec_parse_placement(dictionary.get('args')[2], placement, False)
         placement.update(guard)
         placement.update(c1)
         placement.update(c2)
         return placement
     elif expression == 'par':
-        c1 = place(dictionary.get('args')[0][0], placement, False)
-        c2 = place(dictionary.get('args')[0][1], placement, False)
+        c1 = rec_parse_placement(dictionary.get('args')[0][0], placement, False)
+        c2 = rec_parse_placement(dictionary.get('args')[0][1], placement, False)
         placement.update(c1)
         placement.update(c2)
         return placement
     elif expression == 'seq':
-        c1 = place(dictionary.get('args')[0], placement, False)
-        c2 = place(dictionary.get('args')[1], placement, False)
+        c1 = rec_parse_placement(dictionary.get('args')[0], placement, False)
+        c2 = rec_parse_placement(dictionary.get('args')[1], placement, False)
         placement.update(c1)
         placement.update(c2)
         return placement
 
 
-def dipendenze(dictionary: dict, dependencies: dict, caller):
+def rec_build_functions_chain(dictionary: dict, dependencies: dict, caller):
     expression = dictionary['functor']
     
     if expression == 'fp':
@@ -69,8 +69,8 @@ def dipendenze(dictionary: dict, dependencies: dict, caller):
         return function, function, expression
     elif expression == 'if':
         guard = dictionary.get('args')[0].get('args')[0]
-        c11, c12, exp_type1 = dipendenze(dictionary.get('args')[1], dependencies, guard)
-        c21, c22, exp_type2 = dipendenze(dictionary.get('args')[2], dependencies, guard)
+        c11, c12, exp_type1 = rec_build_functions_chain(dictionary.get('args')[1], dependencies, guard)
+        c21, c22, exp_type2 = rec_build_functions_chain(dictionary.get('args')[2], dependencies, guard)
         
         dependencies[guard] = caller
         dependencies[c11] = guard
@@ -78,8 +78,8 @@ def dipendenze(dictionary: dict, dependencies: dict, caller):
         return c12, c22, expression
 
     elif expression == 'par':
-        c11, c12, exp_type1 = dipendenze(dictionary.get('args')[0][0], dependencies, caller)
-        c21, c22, exp_type2 = dipendenze(dictionary.get('args')[0][1], dependencies, caller)
+        c11, c12, exp_type1 = rec_build_functions_chain(dictionary.get('args')[0][0], dependencies, caller)
+        c21, c22, exp_type2 = rec_build_functions_chain(dictionary.get('args')[0][1], dependencies, caller)
 
         return1 = (c11, c12) if exp_type1 not in ['fp', 'seq'] else c12
         return2 = (c21, c22) if exp_type2 not in ['fp', 'seq'] else c22
@@ -87,8 +87,8 @@ def dipendenze(dictionary: dict, dependencies: dict, caller):
         return return1, return2, expression
 
     elif expression == 'seq':
-        c11, c12, exp_type1 = dipendenze(dictionary.get('args')[0], dependencies, caller)
-        c21, c22, exp_type2 = dipendenze(dictionary.get('args')[1], dependencies, c12)
+        c11, c12, exp_type1 = rec_build_functions_chain(dictionary.get('args')[0], dependencies, caller)
+        c21, c22, exp_type2 = rec_build_functions_chain(dictionary.get('args')[1], dependencies, c12)
 
         if c21 not in dependencies and type(c21) is not tuple:
             if exp_type1 == 'seq':
@@ -111,10 +111,10 @@ def dipendenze(dictionary: dict, dependencies: dict, caller):
         return return1, return2, expression
 
 
-def build_placement(prolog_placement : dict) -> dict[str, PlacedFunction] :
+def parse_placement(prolog_placement : dict) -> dict[str, PlacedFunction] :
     orchestration_id = prolog_placement["OrchestrationId"] # TODO facci qualcosa
 
-    return place(prolog_placement['Placement'], {}, False)
+    return rec_parse_placement(prolog_placement['Placement'], {}, False)
 
 def unpack_nested_tuples(t: tuple):
     elements = list(t)
@@ -128,12 +128,12 @@ def unpack_nested_tuples(t: tuple):
     
     return to_return
 
-def find_dependencies(prolog_placement: dict) -> dict[str, str]:
+def build_functions_chain(prolog_placement: dict) -> dict[str, str]:
     #orchestration_id = placement["OrchestrationId"]  # TODO facci qualcosa
 
     dependencies = {}
 
-    _ = dipendenze(prolog_placement['Placement'], dependencies, None)
+    _ = rec_build_functions_chain(prolog_placement['Placement'], dependencies, None)
 
     to_return = {}
 
@@ -393,8 +393,8 @@ def main(argv):
                                     
                         raw_placement = query[0] # it is a dictionary
 
-                        function_chain = find_dependencies(raw_placement)
-                        placement = build_placement(raw_placement)
+                        function_chain = build_functions_chain(raw_placement)
+                        placement = parse_placement(raw_placement)
                         
                         #print(placement)
                         #print(function_chain)
@@ -568,7 +568,6 @@ def main(argv):
 
     logger.info("Writing JSON's execution report on '%s'", config.report_output_file)
 
-    # TODO MAKE IT COMMAND ARG
     with open(config.report_output_file, 'w') as file:
         json.dump(stats_to_dump, indent = 4, default = str, fp = file)
 
