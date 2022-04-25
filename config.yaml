@@ -1,11 +1,13 @@
 epochs : 100
 infrastructure_path: "./test_set/infrastructures/infrastructure_0.pl"
 node_crash_probability : 0.05
+node_resurrection_probability : 0.3
 link_crash_probability : 0.05
+link_resurrection_probability : 0.3
 applications:
   #- path : path of application's Prolog definition
   #  placement_trigger_probability: probability of trigger placement of that application
   - path : ./test_set/applications/application_0.pl
     placement_trigger_probability : 0.6
   - path : ./test_set/applications/application_1.pl
-    placement_trigger_probability : 0.3
+    placement_trigger_probability : 0.4

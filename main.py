@@ -214,7 +214,6 @@ def main(argv):
     default_infrastructure_path = os.path.join(secfaas2fog_abs_path, 'infrastructure.pl')
 
     # statistical variables
-    # TODO better comments
     applications_stats : dict = {}
     node_events : list = []
     link_events : list = []
@@ -394,7 +393,6 @@ def main(argv):
                     applications_stats[application_name]['placements'].append(placement_data)
 
                     if (application_can_be_placed) :
-                        pass
 
                         # create application instance
                         # TODO actually we have 1 application so it is defined above
@@ -419,12 +417,12 @@ def main(argv):
         # node crash
         node_crashed = take_decision(config.node_crash_probability)
 
-        node_resurrected = take_decision(config.node_crash_probability)
+        node_resurrected = take_decision(config.node_resurrection_probability)
 
         # link crash
         link_crashed = take_decision(config.link_crash_probability)
 
-        link_resurrected = take_decision(config.link_crash_probability)
+        link_resurrected = take_decision(config.link_resurrection_probability)
 
         if node_crashed:
             node_id = infrastructure.simulate_node_crash()
