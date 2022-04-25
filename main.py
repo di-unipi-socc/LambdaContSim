@@ -29,9 +29,66 @@ def take_decision(probability : float) -> bool:
 
     return random.random() < probability
 
+# TODO commenta
+def load_infrastructure(infrastructure_filename : str) -> Infrastructure:
+    
+    nodes : dict[str, Node] = {}
+    latencies : dict[str, dict[str, ( int, bool )]] = {}
+    
+    # TODO check errors on file opening
+    node_pattern = r'^node\(([^,]+),([^,]+),(\[.*?\]),(\[.*?\]),\(([^,]+),([^,]+),([^\)]+)\)\)\.*'
+    latency_pattern = r'^latency\(([^,]+),([^,]+),([^,]+)\)\.*'
+
+    other_lines = []
+
+    with open(infrastructure_filename, 'r') as f:
+        lines = f.readlines()
+
+        for line in lines:
+            if line.startswith('node'):
+                line = line.replace(' ', '')
+                # print(line)
+                match = re.match(node_pattern, line).groups()
+
+                node_id = match[0]
+                provider = match[1]
+                security_caps = match[2].replace('[','').replace(']','').split(',')
+                software_caps = match[3].replace('[','').replace(']','').split(',')
+                memory = inf if match[4] == 'inf' else int(match[4])
+                v_cpu = inf if match[5] == 'inf' else int(match[5])
+                mhz = inf if match[6] == 'inf' else int(match[6])
+
+                node = Node(node_id, provider, security_caps, software_caps, memory, v_cpu, mhz)
+                nodes[node_id] = node
+
+                # create latency index for the node
+                latencies[node_id] = {}
+
+            elif line.startswith('latency'):
+                line = line.replace(' ', '')
+                match = re.match(latency_pattern, line).groups()
+
+                first_node = match[0]
+                second_node = match[1]
+                latency = int(match[2])
+                
+                dictionary = latencies.get(first_node)
+                dictionary[second_node] = { 'latency' : latency, 'available' : True }
+
+            elif not line.startswith('%'):
+                # save other crucial informations
+                # discarding comments
+                other_lines.append(line)
+        
+        #print(other_lines)
+        # instance infrastructure
+        infrastructure = Infrastructure(nodes, latencies, other_lines)
+
+        return infrastructure
+
 
 # TODO commenta
-def update_infrastructure(infrastructure : Infrastructure, output_filename: str):
+def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     lines = []
 
     nodes = infrastructure.nodes
@@ -159,57 +216,7 @@ def main(argv):
     shutil.copy(config.infrastructure_temp_path, default_infrastructure_path)
 
     # instance infrastructure
-    nodes : dict[str, Node] = {}
-    latencies : dict[str, dict[str, ( int, bool )]] = {}
-    # TODO check errors on file opening
-    node_pattern = r'^node\(([^,]+),([^,]+),(\[.*?\]),(\[.*?\]),\(([^,]+),([^,]+),([^\)]+)\)\)\.*'
-    latency_pattern = r'^latency\(([^,]+),([^,]+),([^,]+)\)\.*'
-
-    other_lines = []
-
-    with open(default_infrastructure_path) as f:
-        lines = f.readlines()
-
-        for line in lines:
-            if line.startswith('node'):
-                line = line.replace(' ', '')
-                #print(line)
-                match = re.match(node_pattern, line).groups()
-
-                node_id = match[0]
-                provider = match[1]
-                security_caps = match[2].replace('[','').replace(']','').split(',')
-                software_caps = match[3].replace('[','').replace(']','').split(',')
-                memory = inf if match[4] == 'inf' else int(match[4])
-                v_cpu = inf if match[5] == 'inf' else int(match[5])
-                mhz = inf if match[6] == 'inf' else int(match[6])
-
-                node = Node(node_id, provider, security_caps, software_caps, memory, v_cpu, mhz)
-                nodes[node_id] = node
-
-                # create latency index for the node
-                latencies[node_id] = {}
-
-            elif line.startswith('latency'):
-                line = line.replace(' ', '')
-                match = re.match(latency_pattern, line).groups()
-
-                first_node = match[0]
-                second_node = match[1]
-                latency = int(match[2])
-                
-                dictionary = latencies.get(first_node)
-                dictionary[second_node] = { 'latency' : latency, 'available' : True }
-
-            elif not line.startswith('%'):
-                # save other crucial informations
-                # discarding comments
-                other_lines.append(line)
-        
-        #print(other_lines)
-        #instance infrastructure
-        infrastructure = Infrastructure(nodes, latencies, other_lines)
-
+    infrastructure : Infrastructure = load_infrastructure(default_infrastructure_path)
     
     # declare Prolog variable
     # once means that we take the first of the results
@@ -303,17 +310,17 @@ def main(argv):
                         functions = placement.keys()
                         for function in functions:
                             node_id = placement[function].node_id
-                            node_obj = nodes[node_id]
+                            node_obj = infrastructure.nodes[node_id]
                             
                             # take resources from the node
                             node_obj.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu)
 
                         # launch application
-                        thread = Orchestrator("Placement", 1000 + index, nodes, function_chain, placement)
+                        thread = Orchestrator("Placement", 1000 + index, infrastructure.nodes, function_chain, placement)
                         thread.start()
 
                 # update infastructure.pl
-                update_infrastructure(infrastructure, default_infrastructure_path)
+                dump_infrastructure(infrastructure, default_infrastructure_path)
 
         # CRASH/RESURRECTION PHASE
 
@@ -386,7 +393,7 @@ def main(argv):
                 link_events.append(event)
         
         # update infastructure.pl
-        update_infrastructure(infrastructure, default_infrastructure_path)
+        dump_infrastructure(infrastructure, default_infrastructure_path)
 
     # statistical prints
 
