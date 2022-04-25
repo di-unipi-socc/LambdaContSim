@@ -25,9 +25,20 @@ class FunctionProcess:
 
         print("%s finished" % self.fun.id)
 
-        # TODO REMOVE
-        if(self.fun.is_guard):
-            print("%s is guard" % self.fun.id)
+        # if the function is a guard of an 'if' statement
+        # we have to decide which branch must be taken
+        # what we know is that the function has 2 child in the chain
+        if self.fun.is_guard:
+            # take the decision
+            decision = True # TODO
+            print("function %s is a guard and its value is %s" % (self.fun.id, decision))
+
+            if decision:
+                # take the True branch
+                pass
+            else:
+                # take the False branch
+                pass
 
         functions_name : list = get_ready_functions(self.chain)
         # delete from chain
