@@ -134,4 +134,7 @@ dmypy.json
 */.DS_Store
 */*/.DS_Store
 
+# JSON files
+*.json
+
 # ADD HERE FILES AND FOLDERS TO BE IGNORED
