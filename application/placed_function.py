@@ -1,5 +1,14 @@
 # class which design a single function of an application
 
+from enum import Enum
+
+# TODO commenta
+class FunctionState(Enum):
+    WAITING = 0
+    RUNNING = 1
+    EXITED = 2
+    CANCELED = 3
+
 class PlacedFunction:
     id = "" # function unique identifier
     node_id = "" # node where the function has been deployed
@@ -11,6 +20,8 @@ class PlacedFunction:
     time_of_execution = 1 # number of epochs TODO parameterize
     # is a guard of a conditional state?
     is_guard : bool = False
+    # state of the function
+    state : FunctionState = FunctionState.WAITING
 
     def __init__(self, function_id: str, node_id : str, sw_reqs: list[str], memory: int, v_cpu: int, mhz: int, is_guard : bool):
         self.id = function_id

@@ -38,7 +38,7 @@ class Node :
         if not isinf(self.v_cpu):
             self.v_cpu -= v_cpu
 
-    def give_back_resources(self, memory: int, v_cpu: int):
+    def release_resources(self, memory: int, v_cpu: int):
         if not isinf(self.memory):
             self.memory += memory
         if not isinf(self.v_cpu):

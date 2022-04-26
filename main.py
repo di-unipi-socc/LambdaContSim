@@ -1,12 +1,11 @@
 import re
-import sys, random
+import sys
 from datetime import datetime
 from swiplserver import PrologError, PrologMQI
 import json
 from config import parse_config
 from infrastructure.infrastructure import Infrastructure
 from infrastructure.node import Node
-from application.function import PlacedFunction
 from math import inf
 import os
 import shutil
@@ -15,6 +14,9 @@ from orchestration.orchestrator import Orchestrator
 import logs
 import logging
 from placement import build_app_chain, parse_placement
+import simpy
+import global_variables as g
+from utils import take_decision
 
 
 def print_usage():
@@ -24,10 +26,6 @@ def print_usage():
     print('\nOptions:')
     print('-c <config file> application config (default config.yaml)')
 
-
-def take_decision(probability : float) -> bool:
-
-    return random.random() < probability
 
 # TODO commenta
 def load_infrastructure(infrastructure_filename : str) -> Infrastructure:
@@ -131,98 +129,27 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
         for line in lines:
             f.write(line)
 
-# Entry point of the simulator
-def main(argv):
 
-    # Setting up
+def simulation(
+    env : simpy.Environment, 
+    steps : int, 
+    infrastructure : Infrastructure, 
+    applications : dict, 
+    applications_stats : dict, 
+    node_events : list, 
+    link_events : list
+    ):
+    
+    # get logger
+    logger = logs.get_logger()
 
-    # logging
-    logger = logs.init_logger() # TODO make it global??
+    # list of applications
+    list_of_applications = []
 
-    # define where SecFaas2Fog is
-    secfaas2fog_folder = os.path.join(os.curdir,'SecFaas2Fog')
-    secfaas2fog_abs_path = os.path.abspath(
-        os.path.expanduser(os.path.expandvars(secfaas2fog_folder)))
-
-    # define defaults Prolog files path
-    default_placer_path = os.path.join(secfaas2fog_abs_path,'placer.pl')
-    default_application_path = os.path.join(secfaas2fog_abs_path, 'application.pl')
-    default_infrastructure_path = os.path.join(secfaas2fog_abs_path, 'infrastructure.pl')
-
-    # define default config path
-    default_config_path = os.path.join(os.curdir,'config.yaml')
-
-    # statistical variables
-    applications_stats : dict = {}
-    node_events : list = []
-    link_events : list = []
-
-    # configuration file path, set to default
-    config_path = default_config_path
-
-    # if the user use ask for help, print application usage message
-    if ('-h' in argv or '--help' in argv):
-        print_usage()
-        return 0
-
-    # we should have 0 or at most 2 command line arguments (-c config)
-    if len(argv) not in [0, 2]:
-        print_usage()
-        return 1
-
-    # parse command line arguments
-    for i in range(0, len(argv) - 1, 2):
+    for step_number in range(0, steps):
         
-        option = argv[i]
-        option_value = argv[i + 1]
-        
-        if (option == '-c'):
-            # save into config_path variable
-            config_path = option_value
-        else:
-            # unknown option
-            logger.info("Unknown %s option", option)
-    
-    # check if the path is a file
-    if not os.path.exists(config_path) or not os.path.isfile(config_path):
-        logger.error("Config path '%s' not exists or is not a file" % config_path)
-        logger.info("Fallback to default config file %s" % default_config_path)
-        config_path = default_config_path
-        # check that the default config exists
-        if not os.path.exists(config_path) or not os.path.isfile(config_path):
-            logger.critical("Default config path '%s' not exists or is not a file, exit..." % config_path)
-            print_usage()
-            return 1
-    
-    # parse the config file
-    config_has_parsed = parse_config(config_path)
-
-    if not config_has_parsed:
-        logger.critical("Config parsing failed") # TODO devo stamparlo qui?
-        print_usage()
-        return 1
-    else:
-        logger.info("Config correctly parsed")
-    
-    # If silent mode is active don't show info messages but only errors and criticals
-    if(config.silent_mode):
-        logger.info("Silent mode is now active")
-        logger.setLevel(logging.ERROR)
-    
-    # get from config list of applications
-    applications = config.applications
-
-    # save infrastructure file into default path
-    shutil.copy(config.infrastructure_temp_path, default_infrastructure_path)
-
-    # instance infrastructure
-    infrastructure : Infrastructure = load_infrastructure(default_infrastructure_path)
-    
-    # declare Prolog variable
-    # once means that we take the first of the results
-    secfaas2fog_command = "once(secfaas2fog(OrchestrationId, Placement))."
-
-    for index in range(0, config.num_of_epochs):
+        # print the step
+        logger.info("step %d", step_number)
 
         # PLACEMENT PHASE
 
@@ -243,7 +170,7 @@ def main(argv):
                     logger.info("Placement triggered for application %s", application_name)
 
                     # save application file into default path
-                    shutil.copy(application_path, default_application_path)
+                    shutil.copy(application_path, g.default_application_path)
 
                     # try to place this app with SecFaas2Fog
 
@@ -256,13 +183,13 @@ def main(argv):
                     start_time = datetime.now()
                     
                     with PrologMQI(prolog_path_args=[
-                            "-s", default_placer_path
+                            "-s", g.default_placer_path
                     ]) as mqi:
                         with mqi.create_thread() as prolog_thread:
 
                             try:
                             
-                                query = prolog_thread.query(secfaas2fog_command)
+                                query = prolog_thread.query(g.secfaas2fog_command)
                             
                             except PrologError:
                                 logger.error("Prolog execution failed")
@@ -275,11 +202,11 @@ def main(argv):
                                     
                         raw_placement = query[0] # it is a dictionary
 
-                        function_chain = build_app_chain(raw_placement)
+                        application_chain = build_app_chain(raw_placement)
                         placement = parse_placement(raw_placement)
                         
                         #print(placement)
-                        #print(function_chain)
+                        #print(application_chain)
 
                         application_can_be_placed = True
 
@@ -316,11 +243,14 @@ def main(argv):
                             node_obj.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu)
 
                         # launch application
-                        thread = Orchestrator("Placement", 1000 + index, infrastructure.nodes, function_chain, placement)
+                        thread = Orchestrator("Placement", 1000 + step_number, env, infrastructure.nodes, application_chain, placement)
                         thread.start()
 
+                        # add application into a list
+                        list_of_applications.append(placement)
+
                 # update infastructure.pl
-                dump_infrastructure(infrastructure, default_infrastructure_path)
+                dump_infrastructure(infrastructure, g.default_infrastructure_path)
 
         # CRASH/RESURRECTION PHASE
 
@@ -335,19 +265,37 @@ def main(argv):
         link_resurrected = take_decision(config.link_resurrection_probability)
 
         if node_crashed:
-            node_id = infrastructure.simulate_node_crash()
+            crashed_node_id = infrastructure.simulate_node_crash()
             if node_id is not None:
-                logger.info("Node %s crashed", node_id)
+                logger.info("Node %s crashed", crashed_node_id)
                 
                 # add event to the list
                 event = {
                     'type' : 'crash',
-                    'node_id' : node_id,
+                    'node_id' : crashed_node_id,
                     'when' : datetime.now()
                 }
                 node_events.append(event)
 
-                # TODO there are affected applications?
+                # there are affected applications?
+                for placement in list_of_applications:
+                    needs_new_placement = False
+                    # check if in the crashed node were deployed a function of this app
+                    # TODO only waiting and running functions
+                    for fun in placement:
+                        if placement[fun].node_id == crashed_node_id:
+                            needs_new_placement = True
+                            break
+                
+                    if needs_new_placement:
+                        logger.info("Application %s needs a new placement")
+
+                        # release all resources TODO
+
+                        # search for a new placement TODO
+                        event = "crash of node %s" % crashed_node_id
+                        print(event)
+                            
         
         elif node_resurrected:
             node_id = infrastructure.simulate_node_resurrection()
@@ -377,6 +325,8 @@ def main(argv):
                 link_events.append(event)
 
                 # TODO there are affected applications?
+                # a link crash affect the app iff the 2 nodes were 'consecutive'
+                # function must be waiting or running
         
         elif link_resurrected:
             first_node, second_node = infrastructure.simulate_link_resurrection()
@@ -393,9 +343,100 @@ def main(argv):
                 link_events.append(event)
         
         # update infastructure.pl
-        dump_infrastructure(infrastructure, default_infrastructure_path)
+        dump_infrastructure(infrastructure, g.default_infrastructure_path)
 
-    # statistical prints
+        # timeout for 1 step
+        yield env.timeout(1)
+
+
+# Entry point of the simulator
+def main(argv):
+
+    # INITIALIZATION PHASE - Global variables
+
+    g.init()
+
+    # logging
+    logger = logs.init_logger()
+
+    # statistical variables
+    applications_stats : dict = {}
+    node_events : list = []
+    link_events : list = []
+
+    # configuration file path, set to default
+    config_path = g.default_config_path
+
+    # if the user use ask for help, print application usage message
+    if ('-h' in argv or '--help' in argv):
+        print_usage()
+        return 0
+
+    # we should have 0 or at most 2 command line arguments (-c config)
+    if len(argv) not in [0, 2]:
+        print_usage()
+        return 1
+
+    # parse command line arguments
+    for i in range(0, len(argv) - 1, 2):
+        
+        option = argv[i]
+        option_value = argv[i + 1]
+        
+        if (option == '-c'):
+            # save into config_path variable
+            config_path = option_value
+        else:
+            # unknown option
+            logger.info("Unknown %s option", option)
+    
+    # check if the path is a file
+    if not os.path.exists(config_path) or not os.path.isfile(config_path):
+        logger.error("Config path '%s' not exists or is not a file" % config_path)
+        logger.info("Fallback to default config file %s" % g.default_config_path)
+        config_path = g.default_config_path
+        # check that the default config exists
+        if not os.path.exists(config_path) or not os.path.isfile(config_path):
+            logger.critical("Default config path '%s' not exists or is not a file, exit..." % config_path)
+            print_usage()
+            return 1
+    
+    # parse the config file
+    config_has_parsed = parse_config(config_path)
+
+    if not config_has_parsed:
+        logger.critical("Config parsing failed") # TODO devo stamparlo qui?
+        print_usage()
+        return 1
+    else:
+        logger.info("Config correctly parsed")
+    
+    # If silent mode is active don't show info messages but only errors and criticals
+    if(config.silent_mode):
+        logger.info("Silent mode is now active")
+        logger.setLevel(logging.ERROR)
+    
+    # get from config list of applications
+    applications = config.applications
+
+    # save infrastructure file into default path
+    shutil.copy(config.infrastructure_temp_path, g.default_infrastructure_path)
+
+    # instance infrastructure
+    infrastructure : Infrastructure = load_infrastructure(g.default_infrastructure_path)
+
+    # SIMPY PHASE
+    
+    # Instance an enviroment
+    env = simpy.Environment()
+
+    # start simulation
+    env.process(simulation(env, config.num_of_epochs, infrastructure, applications, applications_stats, node_events, link_events))
+
+    # we simulate for num_of_epochs epochs
+    env.run(until=config.num_of_epochs)
+
+    # STATISTICS
 
     logger.info("--- STATISTICS ---")
 

@@ -1,4 +1,4 @@
-from application.function import PlacedFunction
+from application.placed_function import PlacedFunction
 
 # function used to parse prolog placement
 
