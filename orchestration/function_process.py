@@ -1,45 +1,70 @@
 # this class represent a simpy process which runs a particular function
 
 import simpy
+from application.application import Application, ApplicationState
 
 from application.placed_function import FunctionState, PlacedFunction
 from infrastructure.node import Node
+from logs import get_logger
 from utils import delete_executed_function, delete_functions_chain_by_id, get_next_functions_by_id, get_ready_functions, take_decision
 
 class FunctionProcess:
-    def __init__(self, fun : PlacedFunction, env : simpy.Environment, infrastructure, application_chain, placement):
+    def __init__(self, fun : PlacedFunction, env : simpy.Environment, application : Application):
         self.fun = fun
 
         self.env = env
 
         self.action = env.process(self.run())
 
-        self.infrastructure = infrastructure
-        self.application_chain = application_chain
-
-        self.placement = placement
+        self.application = application
 
     def run(self):
+
+        # get the logger
+        logger = get_logger()
 
         # function is running
         self.fun.state = FunctionState.RUNNING
 
         duration = 1
-        yield self.env.timeout(duration)
+
+        try:
+
+            yield self.env.timeout(duration)
+
+        except simpy.Interrupt:
+            logger.info("Application %s - Function %s has been interrupted", self.application.id, self.fun.id)
+
+            # function has been canceled
+            self.fun.state = FunctionState.CANCELED
+
+            # release resources
+
+            fun_name = self.fun.id
+            node_id = self.application.placement[fun_name].node_id
+            node : Node = self.application.infrastructure_nodes[node_id]
+            node.release_resources(self.application.placement[fun_name].memory, self.application.placement[fun_name].v_cpu)
+
+            return
+        
 
         # function exited
-        self.fun.state = FunctionState.EXITED
+        self.fun.state = FunctionState.COMPLETED
 
         #print("Function %s finished" % self.fun.id)
 
         # get functions which depends on me
-        dependent_functions : list = get_next_functions_by_id(self.application_chain, self.fun.id)
+        dependent_functions : list = get_next_functions_by_id(self.application.chain, self.fun.id)
         
         # delete myself from the chain
-        delete_executed_function(self.application_chain, self.fun.id)
+        delete_executed_function(self.application.chain, self.fun.id)
 
         # get ready functions
-        ready_functions : list = get_ready_functions(self.application_chain)
+        ready_functions : list = get_ready_functions(self.application.chain)
+
+        # when there aren't ready functions -> application finished
+        if len(ready_functions) == 0:
+            self.application.state = ApplicationState.COMPLETED
 
         # get ready functions which was depending on me
         to_execute : list = []
@@ -54,7 +79,7 @@ class FunctionProcess:
         if self.fun.is_guard:
             # take the decision with probability 0.5
             decision = take_decision(0.5)
-            print("Function %s is a guard and its value is %s" % (self.fun.id, decision))
+            #print("Function %s is a guard and its value is %s" % (self.fun.id, decision))
 
             taken_branch = ""
             discarded_branch = ""
@@ -71,24 +96,26 @@ class FunctionProcess:
             #print("taken: %s" % taken_branch)
             
             # delete discarded function and all functions which was depending
-            deleted_functions = delete_functions_chain_by_id(self.application_chain, discarded_branch)
+            deleted_functions = delete_functions_chain_by_id(self.application.chain, discarded_branch)
             # release resources
             for fun in deleted_functions:
-                self.placement[fun].state = FunctionState.CANCELED
-                node_id = self.placement[fun].node_id
-                node : Node = self.infrastructure[node_id]
-                node.release_resources(self.placement[fun].memory, self.placement[fun].v_cpu)
+                self.application.placement[fun].state = FunctionState.CANCELED
+                node_id = self.application.placement[fun].node_id
+                node : Node = self.application.infrastructure_nodes[node_id]
+                node.release_resources(self.application.placement[fun].memory, self.application.placement[fun].v_cpu)
 
             # execute the taken function
-            fun_process = FunctionProcess(self.placement[taken_branch], self.env, self.infrastructure, self.application_chain, self.placement)
+            fun_process = FunctionProcess(self.application.placement[taken_branch], self.env, self.application)
+            self.application.function_processes.append(fun_process)
         
         else:
             # execute the functions
             for fun in to_execute:
-                fun_process = FunctionProcess(self.placement[fun], self.env, self.infrastructure, self.application_chain, self.placement)
+                fun_process = FunctionProcess(self.application.placement[fun], self.env, self.application)
+                self.application.function_processes.append(fun_process)
         
         # free node memory
         fun_name = self.fun.id
-        node_id = self.placement[fun_name].node_id
-        node : Node = self.infrastructure[node_id]
-        node.release_resources(self.placement[fun_name].memory, self.placement[fun_name].v_cpu)
+        node_id = self.application.placement[fun_name].node_id
+        node : Node = self.application.infrastructure_nodes[node_id]
+        node.release_resources(self.application.placement[fun_name].memory, self.application.placement[fun_name].v_cpu)

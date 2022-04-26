@@ -3,6 +3,8 @@ import sys
 from datetime import datetime
 from swiplserver import PrologError, PrologMQI
 import json
+from application.application import Application, ApplicationState
+from application.placed_function import FunctionState
 from config import parse_config
 from infrastructure.infrastructure import Infrastructure
 from infrastructure.node import Node
@@ -130,6 +132,91 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
             f.write(line)
 
 
+def place_application(
+    application_name : str,
+    event : str,
+    infrastructure : Infrastructure,
+    applications_stats : dict,
+    ):
+
+    # get the logger
+    logger = logs.get_logger()
+
+    # try to place this app with SecFaas2Fog
+
+    # it will reply with a valid placement iff application can be placed
+    raw_placement = None
+    application_can_be_placed = False
+    query = False
+
+    # save SecFaas2Fog starting time
+    start_time = datetime.now()
+
+    with PrologMQI(prolog_path_args=[
+            "-s", g.default_placer_path
+    ]) as mqi:
+        with mqi.create_thread() as prolog_thread:
+
+            try:
+            
+                query = prolog_thread.query(g.secfaas2fog_command)
+            
+            except PrologError:
+                logger.error("Prolog execution failed")
+            
+            finally:
+                # save SecFaas2Fog finish time
+                end_time = datetime.now()
+
+    if query != False and isinstance(query, list):
+                    
+        raw_placement = query[0] # it is a dictionary
+
+        application_chain = build_app_chain(raw_placement)
+        placement = parse_placement(raw_placement)
+        
+        #print(placement)
+        #print(application_chain)
+
+        application_can_be_placed = True
+
+        logger.info("Placement found for %s", application_name)
+    else:
+        logger.info("Placement failed for %s", application_name)
+
+    if application_name not in applications_stats.keys():
+        applications_stats[application_name] = {}
+        applications_stats[application_name]['placements'] = []
+
+    # normal placement
+    placement_data : dict = {
+        'event' : event,
+        'start' : start_time,
+        'end' : end_time,
+        'success' : application_can_be_placed
+    }
+
+    applications_stats[application_name]['placements'].append(placement_data)
+
+    if (application_can_be_placed) :
+
+        # create application instance
+        application_obj = Application(application_name, application_chain, placement, infrastructure.nodes)
+        
+        # place application over the infrastructure (update nodes capabilities: memory, number of vCPUs )
+        functions = placement.keys()
+        for function in functions:
+            node_id = placement[function].node_id
+            node_obj = infrastructure.nodes[node_id]
+            
+            # take resources from the node
+            node_obj.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu)
+        
+        return application_obj
+    
+    return None
+
+
 def simulation(
     env : simpy.Environment, 
     steps : int, 
@@ -144,12 +231,12 @@ def simulation(
     logger = logs.get_logger()
 
     # list of applications
-    list_of_applications = []
+    list_of_applications : list[Application] = []
 
     for step_number in range(0, steps):
         
         # print the step
-        logger.info("step %d", step_number)
+        logger.info("--- STEP %d ---", step_number)
 
         # PLACEMENT PHASE
 
@@ -172,82 +259,17 @@ def simulation(
                     # save application file into default path
                     shutil.copy(application_path, g.default_application_path)
 
-                    # try to place this app with SecFaas2Fog
+                    # place
+                    event = "trigger"
+                    application = place_application(application_name, event, infrastructure, applications_stats)
 
-                    # it will reply with a valid placement iff application can be placed
-                    raw_placement = None
-                    application_can_be_placed = False
-                    query = False
-                    
-                    # save SecFaas2Fog starting time
-                    start_time = datetime.now()
-                    
-                    with PrologMQI(prolog_path_args=[
-                            "-s", g.default_placer_path
-                    ]) as mqi:
-                        with mqi.create_thread() as prolog_thread:
-
-                            try:
-                            
-                                query = prolog_thread.query(g.secfaas2fog_command)
-                            
-                            except PrologError:
-                                logger.error("Prolog execution failed")
-                            
-                            finally:
-                                # save SecFaas2Fog finish time
-                                end_time = datetime.now()
-
-                    if query != False and isinstance(query, list):
-                                    
-                        raw_placement = query[0] # it is a dictionary
-
-                        application_chain = build_app_chain(raw_placement)
-                        placement = parse_placement(raw_placement)
-                        
-                        #print(placement)
-                        #print(application_chain)
-
-                        application_can_be_placed = True
-
-                        logger.info("Placement found for %s", application_name)
-                    else:
-                        logger.info("Placement failed for %s", application_name)
-                    
-                    if application_name not in applications_stats.keys():
-                        applications_stats[application_name] = {}
-                        applications_stats[application_name]['placements'] = []
-
-                    # normal placement
-                    placement_data : dict = {
-                        'event' : "trigger",
-                        'start' : start_time,
-                        'end' : end_time,
-                        'success' : application_can_be_placed
-                    }
-
-                    applications_stats[application_name]['placements'].append(placement_data)
-
-                    if (application_can_be_placed) :
-
-                        # create application instance
-                        # TODO actually we have 1 application so it is defined above
-
-                        # place application over the infrastructure (update nodes capabilities: memory, number of vCPUs )
-                        functions = placement.keys()
-                        for function in functions:
-                            node_id = placement[function].node_id
-                            node_obj = infrastructure.nodes[node_id]
-                            
-                            # take resources from the node
-                            node_obj.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu)
-
+                    if application is not None:
                         # launch application
-                        thread = Orchestrator("Placement", 1000 + step_number, env, infrastructure.nodes, application_chain, placement)
+                        thread = Orchestrator("Placement", 1000 + step_number, env, application)
                         thread.start()
 
                         # add application into a list
-                        list_of_applications.append(placement)
+                        list_of_applications.append(application)
 
                 # update infastructure.pl
                 dump_infrastructure(infrastructure, g.default_infrastructure_path)
@@ -264,9 +286,12 @@ def simulation(
 
         link_resurrected = take_decision(config.link_resurrection_probability)
 
+        # TODO commenta
+        apps_just_added : list[Application] = []
+
         if node_crashed:
             crashed_node_id = infrastructure.simulate_node_crash()
-            if node_id is not None:
+            if crashed_node_id is not None:
                 logger.info("Node %s crashed", crashed_node_id)
                 
                 # add event to the list
@@ -278,25 +303,67 @@ def simulation(
                 node_events.append(event)
 
                 # there are affected applications?
-                for placement in list_of_applications:
+                for application in list_of_applications:
+
+                    # completed apps are not interesting
+                    if application.state == ApplicationState.COMPLETED:
+                        continue
+
                     needs_new_placement = False
+                    
                     # check if in the crashed node were deployed a function of this app
-                    # TODO only waiting and running functions
-                    for fun in placement:
-                        if placement[fun].node_id == crashed_node_id:
-                            needs_new_placement = True
-                            break
+                    # check only waiting and running functions
+                    for function_name in application.placement:
+                        function = application.placement[function_name]
+                        if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
+                            if function.node_id == crashed_node_id:
+                                needs_new_placement = True
+                                break
                 
                     if needs_new_placement:
-                        logger.info("Application %s needs a new placement")
+                        logger.info("Application %s needs a new placement", application.id)
+                        
+                        # update application status
+                        application.state = ApplicationState.CANCELED
 
-                        # release all resources TODO
+                        # trigger application functions
+                        for function_process in application.function_processes:
+                            if function_process.fun.state == FunctionState.RUNNING:
+                                function_process.action.interrupt()
 
-                        # search for a new placement TODO
-                        event = "crash of node %s" % crashed_node_id
-                        print(event)
-                            
-        
+                        # release all resources of waiting functions
+                        for function_name in application.placement:
+                            function = application.placement[function_name]
+                            if function.state == FunctionState.WAITING:
+                                node_id = function.node_id
+                                node_obj = application.infrastructure_nodes[node_id]
+                                node_obj.release_resources(function.memory, function.v_cpu)
+
+                                logger.info("Application %s - Function %s has been canceled", application.id, function.id)
+                                function_process.fun.state = FunctionState.CANCELED
+
+                        # search for a new placement
+
+                        # save application file into default path
+                        application_path = os.path.join('./test_set/applications', application.id)
+                        shutil.copy(application_path, g.default_application_path)
+
+                        event = "node %s crashed" % crashed_node_id
+
+                        application = place_application(application.id, event, infrastructure, applications_stats)
+
+                        if application is not None:
+                            # launch application
+                            thread = Orchestrator("Placement", 2000 + step_number, env, application)
+                            thread.start()
+
+                            # add application into a list
+                            # this application must not be affected by the crash because
+                            # it has been just placed
+                            # so we add it in a temportary app list
+                            apps_just_added.append(application)                                           
+
+
         elif node_resurrected:
             node_id = infrastructure.simulate_node_resurrection()
             if node_id is not None:
@@ -309,7 +376,8 @@ def simulation(
                     'when' : datetime.now()
                 }
                 node_events.append(event)
-        
+
+
         if link_crashed:
             first_node, second_node = infrastructure.simulate_link_crash()
             if first_node != None and second_node != None:
@@ -324,9 +392,70 @@ def simulation(
                 }
                 link_events.append(event)
 
-                # TODO there are affected applications?
                 # a link crash affect the app iff the 2 nodes were 'consecutive'
-                # function must be waiting or running
+                # functions must be waiting or running
+                # there are affected applications?
+                for application in list_of_applications:
+
+                    # completed apps are not interesting
+                    if application.state == ApplicationState.COMPLETED:
+                        continue
+
+                    needs_new_placement = False
+                    
+                    # check if in the crashed node were deployed a function of this app
+                    # check only waiting and running functions
+                    for function_name in application.placement:
+                        function = application.placement[function_name]
+                        if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
+                            # TODO make it better
+                            if function.node_id in [first_node, second_node]:
+                                needs_new_placement = True
+                                break
+                
+                    if needs_new_placement:
+                        logger.info("Application %s needs a new placement", application.id)
+                        
+                        # update application status
+                        application.state = ApplicationState.CANCELED
+
+                        # trigger application functions
+                        for function_process in application.function_processes:
+                            if function_process.fun.state == FunctionState.RUNNING:
+                                function_process.action.interrupt()
+
+                        # release all resources of waiting functions
+                        for function_name in application.placement:
+                            function = application.placement[function_name]
+                            if function.state == FunctionState.WAITING:
+                                node_id = function.node_id
+                                node_obj = application.infrastructure_nodes[node_id]
+                                node_obj.release_resources(function.memory, function.v_cpu)
+
+                                logger.info("Application %s - Function %s has been canceled", application.id, function.id)
+                                function_process.fun.state = FunctionState.CANCELED
+
+                        # search for a new placement
+
+                        # save application file into default path
+                        application_path = os.path.join('./test_set/applications', application.id)
+                        shutil.copy(application_path, g.default_application_path)
+
+                        event = "link %s <-> %s crashed" % (first_node, second_node)
+
+                        application = place_application(application.id, event, infrastructure, applications_stats)
+
+                        if application is not None:
+                            # launch application
+                            thread = Orchestrator("Placement", 2000 + step_number, env, application)
+                            thread.start()
+
+                            # add application into a list
+                            # this application must not be affected by the crash because
+                            # it has been just placed
+                            # so we add it in a temportary app list
+                            apps_just_added.append(application)                                           
+
         
         elif link_resurrected:
             first_node, second_node = infrastructure.simulate_link_resurrection()
@@ -342,10 +471,13 @@ def simulation(
                 }
                 link_events.append(event)
         
+        # update list of applications
+        list_of_applications += apps_just_added
+
         # update infastructure.pl
         dump_infrastructure(infrastructure, g.default_infrastructure_path)
 
-        # timeout for 1 step
+        # make 1 step
         yield env.timeout(1)
 
 

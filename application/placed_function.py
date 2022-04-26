@@ -6,7 +6,7 @@ from enum import Enum
 class FunctionState(Enum):
     WAITING = 0
     RUNNING = 1
-    EXITED = 2
+    COMPLETED = 2
     CANCELED = 3
 
 class PlacedFunction:
