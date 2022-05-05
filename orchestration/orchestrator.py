@@ -3,8 +3,7 @@ import simpy
 from application.application import Application, ApplicationState
 
 from orchestration.function_process import FunctionProcess
-from utils import delete_executed_function, get_ready_functions
-from infrastructure.node import Node
+from utils import get_ready_functions
 
 class Orchestrator(threading.Thread):
 

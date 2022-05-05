@@ -7,6 +7,7 @@ from application.placed_function import FunctionState, PlacedFunction
 from infrastructure.node import Node
 from logs import get_logger
 from utils import delete_executed_function, delete_functions_chain_by_id, get_next_functions_by_id, get_ready_functions, take_decision
+import config
 
 class FunctionProcess:
     def __init__(self, fun : PlacedFunction, env : simpy.Environment, application : Application):
@@ -26,11 +27,10 @@ class FunctionProcess:
         # function is running
         self.fun.state = FunctionState.RUNNING
 
-        duration = 1
-
         try:
-
-            yield self.env.timeout(duration)
+            
+            # simulate the function execution
+            yield self.env.timeout(config.function_duration)
 
         except simpy.Interrupt:
             logger.info("Application %s - Function %s has been interrupted", self.application.id, self.fun.id)
