@@ -298,7 +298,7 @@ def simulation(
                 event = {
                     'type' : 'crash',
                     'node_id' : crashed_node_id,
-                    'when' : datetime.now()
+                    'epoch' : step_number
                 }
                 node_events.append(event)
 
@@ -363,7 +363,7 @@ def simulation(
                             # so we add it in a temportary app list
                             apps_just_added.append(application)                                           
 
-
+        # TODO un nodo puo' risorgere anche se avviene crash di un altro
         elif node_resurrected:
             node_id = infrastructure.simulate_node_resurrection()
             if node_id is not None:
@@ -373,7 +373,7 @@ def simulation(
                 event = {
                     'type' : 'resurrection',
                     'node_id' : node_id,
-                    'when' : datetime.now()
+                    'epoch' : step_number
                 }
                 node_events.append(event)
 
@@ -388,7 +388,7 @@ def simulation(
                     'type' : 'crash',
                     'first_node_id' : first_node,
                     'second_node_id' : second_node,
-                    'when' : datetime.now()
+                    'epoch' : step_number
                 }
                 link_events.append(event)
 
@@ -467,7 +467,7 @@ def simulation(
                     'type' : 'resurrection',
                     'first_node_id' : first_node,
                     'second_node_id' : second_node,
-                    'when' : datetime.now()
+                    'epoch' : step_number
                 }
                 link_events.append(event)
         
