@@ -3,7 +3,7 @@ from enum import Enum
 
 # class which represents an infrastracture node
 
-# TODO commenta
+# a node can be edge, fog or cloud
 class NodeCategory(Enum):
     EDGE = 0
     FOG = 1
@@ -86,7 +86,7 @@ class Node :
             return NodeCategory.CLOUD
 
         # if a node has poor resources, it SHOULD be an edge
-        # TODO encoded values
+        # TODO hardcoded values, maybe we can do it better?
         if self.memory <= 2000 or self.v_cpu <= 4:
             return NodeCategory.EDGE
         

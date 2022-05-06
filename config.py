@@ -55,7 +55,5 @@ def parse_config(path):
                 return False
 
         # TODO check values
-
-        # TODO PRINT VALUES TO SHOW SUCCESS?
         
         return True

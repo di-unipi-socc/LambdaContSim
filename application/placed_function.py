@@ -1,13 +1,14 @@
-# class which design a single function of an application
-
 from enum import Enum
 
-# TODO commenta
+# class which design a single function of an application
+
+# Possible states of a function
 class FunctionState(Enum):
     WAITING = 0
     RUNNING = 1
     COMPLETED = 2
     CANCELED = 3
+
 
 class PlacedFunction:
     id = "" # function unique identifier
@@ -17,7 +18,6 @@ class PlacedFunction:
     memory : int = 0
     v_cpu : int = 0
     mhz : int = 0
-    time_of_execution = 1 # number of epochs TODO parameterize
     # is a guard of a conditional state?
     is_guard : bool = False
     # state of the function

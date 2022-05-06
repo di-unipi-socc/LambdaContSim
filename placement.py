@@ -49,7 +49,6 @@ def rec_parse_placement(dictionary : dict, placement : dict, is_guard : bool):
 
 
 def parse_placement(prolog_placement : dict) -> dict[str, PlacedFunction] :
-    orchestration_id = prolog_placement["OrchestrationId"] # TODO facci qualcosa
 
     return rec_parse_placement(prolog_placement['Placement'], {}, False)
 
@@ -120,7 +119,6 @@ def unpack_nested_tuples(t: tuple):
 
 
 def build_app_chain(prolog_placement: dict) -> dict[str, str]:
-    #orchestration_id = placement["OrchestrationId"]  # TODO facci qualcosa
 
     dependencies = {}
 
