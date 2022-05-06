@@ -77,8 +77,18 @@ class FunctionProcess:
         # we have to decide which branch must be taken
         # what we know is that the guard will have 2 child in the chain
         if self.fun.is_guard:
-            # take the decision with probability 0.5
-            decision = take_decision(0.5)
+
+            # probability that the guard is True, default is 0.5
+            guard_probability = 0.5
+
+            application_id = self.application.id
+            guards : dict = config.applications[application_id]['guards']
+            
+            if self.fun.id in guards.keys():
+                guard_probability = guards[self.fun.id]
+
+            # take the decision
+            decision = take_decision(guard_probability)
             #print("Function %s is a guard and its value is %s" % (self.fun.id, decision))
 
             taken_branch = ""

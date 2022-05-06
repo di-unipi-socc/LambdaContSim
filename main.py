@@ -199,7 +199,7 @@ def place_application(
 
     applications_stats[application_name]['placements'].append(placement_data)
 
-    if (application_can_be_placed) :
+    if application_can_be_placed :
 
         # create application instance
         application_obj = Application(application_name, application_filename, application_chain, placement, infrastructure.nodes)
@@ -219,12 +219,11 @@ def place_application(
 
 
 def simulation(
-    env : simpy.Environment, 
-    steps : int, 
-    infrastructure : Infrastructure, 
-    applications : dict, 
-    applications_stats : dict, 
-    node_events : list, 
+    env : simpy.Environment,
+    steps : int,
+    infrastructure : Infrastructure,
+    applications_stats : dict,
+    node_events : list,
     link_events : list
     ):
     
@@ -245,7 +244,9 @@ def simulation(
         if len(infrastructure.nodes) > len(infrastructure.crashed_nodes):
 
             # for each application
-            for app in applications:
+            for application_name in config.applications:
+
+                app = config.applications[application_name]
                 
                 # we want to trigger a new placement request?
                 trigger = take_decision(app['placement_trigger_probability'])
@@ -253,9 +254,6 @@ def simulation(
                 # get application path
                 application_filename = app['filename']
                 application_path = os.path.join(g.applications_path, application_filename)
-
-                # get the name of the application
-                application_name = app['name']
 
                 if trigger:
                     logger.info("Placement triggered for application %s", application_name)
@@ -571,9 +569,6 @@ def main(argv):
     if(config.silent_mode):
         logger.info("Silent mode is now active")
         logger.setLevel(logging.ERROR)
-    
-    # get from config list of applications
-    applications = config.applications
 
     # save infrastructure file into default path
     shutil.copy(config.infrastructure_temp_path, g.secfaas2fog_infrastructure_path)
@@ -587,7 +582,7 @@ def main(argv):
     env = simpy.Environment()
 
     # start simulation
-    env.process(simulation(env, config.num_of_epochs, infrastructure, applications, applications_stats, node_events, link_events))
+    env.process(simulation(env, config.num_of_epochs, infrastructure, applications_stats, node_events, link_events))
 
     # we simulate for num_of_epochs epochs
     env.run(until=config.num_of_epochs)

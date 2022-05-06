@@ -10,15 +10,12 @@ link_resurrection_probability : 0.3
 applications:
   #- path : path of application's Prolog definition
   #  placement_trigger_probability: probability of trigger placement of that application
-  - name: Application 0
+  "Application 0" :
     filename : application_0.pl
     placement_trigger_probability : 0.6
-    guards:
-      - name: fDCC
-        probability: 0.6
-  - name: Application 1
+    guards : {}
+  "Application 1" :
     filename : application_1.pl
     placement_trigger_probability : 0.4
-    guards:
-      - name: fDCC
-        probability: 0.7
+    guards :
+      fDCC : 0.7

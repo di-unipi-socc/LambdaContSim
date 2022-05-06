@@ -41,7 +41,8 @@ def parse_config(path):
         applications = config['applications']
 
         # check that paths are correct
-        for app in applications:
+        for app_name in applications:
+            app = applications[app_name]
             application_filename = app['filename']
             application_path = os.path.join(g.applications_path, application_filename)
             if not os.path.isfile(application_path):
