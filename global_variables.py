@@ -4,10 +4,12 @@
 #
 # ==============================================================================
 
-secfaas2fog_abs_path = ""
-default_placer_path = ""
-default_application_path = ""
-default_infrastructure_path = ""
+secfaas2fog_path = ""
+secfaas2fog_placer_path = ""
+secfaas2fog_application_path = ""
+secfaas2fog_infrastructure_path = ""
+infrastructures_path = ""
+applications_path = ""
 default_config_path = ""
 secfaas2fog_command = ""
 
@@ -20,26 +22,30 @@ def init():
         Later on they can reference 'g.logger' to get the logger
     """
 
-    global secfaas2fog_abs_path
-    global default_placer_path
-    global default_application_path
-    global default_infrastructure_path
+    global secfaas2fog_path
+    global secfaas2fog_placer_path
+    global secfaas2fog_application_path
+    global secfaas2fog_infrastructure_path
+    global infrastructures_path
+    global applications_path
     global default_config_path
     global secfaas2fog_command
 
     # define where SecFaas2Fog is
     import os
-    secfaas2fog_folder = os.path.join(os.curdir,'SecFaas2Fog')
-    secfaas2fog_abs_path = os.path.abspath(
-        os.path.expanduser(os.path.expandvars(secfaas2fog_folder)))
+    secfaas2fog_path = os.path.join(os.curdir, 'SecFaas2Fog')
 
     # default Prolog files path
-    default_placer_path = os.path.join(secfaas2fog_abs_path,'placer.pl')
-    default_application_path = os.path.join(secfaas2fog_abs_path, 'application.pl')
-    default_infrastructure_path = os.path.join(secfaas2fog_abs_path, 'infrastructure.pl')
+    secfaas2fog_placer_path = os.path.join(secfaas2fog_path, 'placer.pl')
+    secfaas2fog_application_path = os.path.join(secfaas2fog_path, 'application.pl')
+    secfaas2fog_infrastructure_path = os.path.join(secfaas2fog_path, 'infrastructure.pl')
+
+    # default infrastructures and applications paths
+    infrastructures_path = os.path.join(os.curdir, 'test_set', 'infrastructures')
+    applications_path = os.path.join(os.curdir, 'test_set', 'applications')
 
     # default config path
-    default_config_path = os.path.join(os.curdir,'config.yaml')
+    default_config_path = os.path.join(os.curdir, 'config.yaml')
 
     # SecFaas2Fog Prolog command
     # once means that we take the first of the results

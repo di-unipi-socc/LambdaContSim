@@ -11,7 +11,8 @@ class ApplicationState(Enum):
     CANCELED = 3
 
 class Application:
-    id = "" # application name
+    id = "" # Application name
+    filename = ""
     state : ApplicationState = ApplicationState.PLACED
     chain : dict
     placement : dict
@@ -19,8 +20,9 @@ class Application:
     function_processes : list = []
 
 
-    def __init__(self, app_id: str, chain: dict, placement : dict, infrastructure : dict):
+    def __init__(self, app_id: str, filename: str, chain: dict, placement : dict, infrastructure : dict):
         self.id = app_id
+        self.filename = filename
         self.chain = chain
         self.placement = placement
         self.infrastructure_nodes = infrastructure

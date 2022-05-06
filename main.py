@@ -134,6 +134,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
 
 def place_application(
     application_name : str,
+    application_filename : str,
     event : str,
     infrastructure : Infrastructure,
     applications_stats : dict,
@@ -153,7 +154,7 @@ def place_application(
     start_time = datetime.now()
 
     with PrologMQI(prolog_path_args=[
-            "-s", g.default_placer_path
+            "-s", g.secfaas2fog_placer_path
     ]) as mqi:
         with mqi.create_thread() as prolog_thread:
 
@@ -201,7 +202,7 @@ def place_application(
     if (application_can_be_placed) :
 
         # create application instance
-        application_obj = Application(application_name, application_chain, placement, infrastructure.nodes)
+        application_obj = Application(application_name, application_filename, application_chain, placement, infrastructure.nodes)
         
         # place application over the infrastructure (update nodes capabilities: memory, number of vCPUs )
         functions = placement.keys()
@@ -248,20 +249,23 @@ def simulation(
                 
                 # we want to trigger a new placement request?
                 trigger = take_decision(app['placement_trigger_probability'])
-                application_path = app['path']
+                
+                # get application path
+                application_filename = app['filename']
+                application_path = os.path.join(g.applications_path, application_filename)
 
-                # get the name of the application (file)
-                application_name = os.path.basename(application_path)
+                # get the name of the application
+                application_name = app['name']
 
                 if trigger:
                     logger.info("Placement triggered for application %s", application_name)
 
                     # save application file into default path
-                    shutil.copy(application_path, g.default_application_path)
+                    shutil.copy(application_path, g.secfaas2fog_application_path)
 
                     # place
                     event = "trigger"
-                    application = place_application(application_name, event, infrastructure, applications_stats)
+                    application = place_application(application_name, application_filename, event, infrastructure, applications_stats)
 
                     if application is not None:
                         # launch application
@@ -272,7 +276,7 @@ def simulation(
                         list_of_applications.append(application)
 
                 # update infastructure.pl
-                dump_infrastructure(infrastructure, g.default_infrastructure_path)
+                dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # CRASH/RESURRECTION PHASE
 
@@ -345,12 +349,12 @@ def simulation(
                         # search for a new placement
 
                         # save application file into default path
-                        application_path = os.path.join('./test_set/applications', application.id)
-                        shutil.copy(application_path, g.default_application_path)
+                        application_path = os.path.join(g.applications_path, application.filename)
+                        shutil.copy(application_path, g.secfaas2fog_application_path)
 
                         event = "node %s crashed" % crashed_node_id
 
-                        application = place_application(application.id, event, infrastructure, applications_stats)
+                        application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
 
                         if application is not None:
                             # launch application
@@ -438,15 +442,15 @@ def simulation(
                         # search for a new placement
 
                         # save application file into default path
-                        application_path = os.path.join('./test_set/applications', application.id)
-                        shutil.copy(application_path, g.default_application_path)
+                        application_path = os.path.join(g.applications_path, application.filename)
+                        shutil.copy(application_path, g.secfaas2fog_application_path)
 
                         event = "link %s <-> %s crashed" % (first_node, second_node)
 
-                        application = place_application(application.id, event, infrastructure, applications_stats)
+                        application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
 
                         if application is not None:
-                            # launch application
+                            # launch application TODO 2000 + ?? SISTEMA
                             thread = Orchestrator("Placement", 2000 + step_number, env, application)
                             thread.start()
 
@@ -475,7 +479,7 @@ def simulation(
         list_of_applications += apps_just_added
 
         # update infastructure.pl
-        dump_infrastructure(infrastructure, g.default_infrastructure_path)
+        dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # make 1 step
         yield env.timeout(1)
@@ -552,10 +556,10 @@ def main(argv):
     applications = config.applications
 
     # save infrastructure file into default path
-    shutil.copy(config.infrastructure_temp_path, g.default_infrastructure_path)
+    shutil.copy(config.infrastructure_temp_path, g.secfaas2fog_infrastructure_path)
 
     # instance infrastructure
-    infrastructure : Infrastructure = load_infrastructure(g.default_infrastructure_path)
+    infrastructure : Infrastructure = load_infrastructure(g.secfaas2fog_infrastructure_path)
 
     # SIMPY PHASE
     

@@ -1,5 +1,6 @@
 import yaml
 import os
+import global_variables as g
 
 def parse_config(path):
     
@@ -24,7 +25,10 @@ def parse_config(path):
         silent_mode = config['silent_mode']
         num_of_epochs = config['epochs']
         function_duration = config['function_duration'] # TODO default 1
-        infrastructure_temp_path = config['infrastructure_path']
+        
+        infrastructure_filename = config['infrastructure_filename']
+        infrastructure_temp_path = os.path.join(g.infrastructures_path, infrastructure_filename)
+
         node_crash_probability = config['node_crash_probability']
         node_resurrection_probability = config['node_resurrection_probability']
         link_crash_probability = config['link_crash_probability']
@@ -38,7 +42,9 @@ def parse_config(path):
 
         # check that paths are correct
         for app in applications:
-            if not os.path.isfile(app['path']):
+            application_filename = app['filename']
+            application_path = os.path.join(g.applications_path, application_filename)
+            if not os.path.isfile(application_path):
                 # TODO log?
                 return False
 
