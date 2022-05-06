@@ -1,4 +1,4 @@
-from infrastructure.node import Node
+from infrastructure.node import Node, NodeCategory
 import random
 
 class Infrastructure :
@@ -18,13 +18,14 @@ class Infrastructure :
         self.other_data = other_data
 
 
-    def simulate_node_crash(self) :
+    def simulate_node_crash(self, category : NodeCategory) :
         keys = self.nodes.keys()
         
         # get the list of active nodes
         active_nodes = []
         for key in keys:
-            if self.nodes.get(key).available:
+            node = self.nodes.get(key)
+            if node.category == category and node.available:
                 active_nodes.append(key)
         
         # if there is no active nodes, then no one can crash
@@ -41,18 +42,25 @@ class Infrastructure :
         return node_to_kill
 
 
-    def simulate_node_resurrection(self, node_to_exclude = None) :
+    def simulate_node_resurrection(self, category : NodeCategory, node_to_exclude = None) :
 
         # remove the node so it can't be chosen for resurrection
         if node_to_exclude is not None:
             self.crashed_nodes.remove(node_to_exclude)
+        
+        # get only nodes with the defined category
+        category_crashed_nodes = []
+        for node_id in self.crashed_nodes:
+            node = self.nodes.get(node_id)
+            if node.category == category:
+                category_crashed_nodes.append(node_id)
 
         # if there is no crashed nodes, then no one can resurrect
-        if len(self.crashed_nodes) == 0:   
+        if len(category_crashed_nodes) == 0:   
             return None
 
         # choose a node to resurrect
-        node_to_resurrect = random.choice(self.crashed_nodes)
+        node_to_resurrect = random.choice(category_crashed_nodes)
         self.nodes.get(node_to_resurrect).available = True
         
         # remove from the list of crashed nodes

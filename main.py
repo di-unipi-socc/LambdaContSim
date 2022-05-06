@@ -7,7 +7,7 @@ from application.application import Application, ApplicationState
 from application.placed_function import FunctionState
 from config import parse_config
 from infrastructure.infrastructure import Infrastructure
-from infrastructure.node import Node
+from infrastructure.node import Node, NodeCategory
 from math import inf
 import os
 import shutil
@@ -279,118 +279,124 @@ def simulation(
         # CRASH/RESURRECTION PHASE
 
         # reset variables
-        crashed_node_id = None
-        resurrected_node_id = None
+        crashed_node_id = {}
+        resurrected_node_id = {}
         first_node = None
         second_node = None
-
-        # node crash
-        node_crashed = take_decision(config.node_crash_probability)
-
-        node_resurrected = take_decision(config.node_resurrection_probability)
-
-        # link crash
-        link_crashed = take_decision(config.link_crash_probability)
-
-        link_resurrected = take_decision(config.link_resurrection_probability)
-
+        
         # TODO commenta
         apps_just_added : list[Application] = []
 
-        if node_crashed:
-            crashed_node_id = infrastructure.simulate_node_crash()
+        # NODE crash
+        for category in ['cloud', 'fog', 'edge']:
             
-            if crashed_node_id is not None:
-                logger.info("Node %s crashed", crashed_node_id)
+            node_crashed = take_decision(config.crash_probability[category])
+
+            node_resurrected = take_decision(config.resurrection_probability[category])
+
+            crashed_node_id[category] = None
+
+            if node_crashed:
+                crashed_node_id[category] = infrastructure.simulate_node_crash(NodeCategory.from_string(category))
                 
-                # add event to the list
-                event = {
-                    'type' : 'crash',
-                    'node_id' : crashed_node_id,
-                    'epoch' : step_number
-                }
-                node_events.append(event)
-
-                # there are affected applications?
-                for application in list_of_applications:
-
-                    # completed apps are not interesting
-                    if application.state == ApplicationState.COMPLETED:
-                        continue
-
-                    needs_new_placement = False
+                if crashed_node_id[category] is not None:
+                    logger.info("Node %s crashed", crashed_node_id[category])
                     
-                    # check if in the crashed node were deployed a function of this app
-                    # check only waiting and running functions
-                    for function_name in application.placement:
-                        function = application.placement[function_name]
-                        if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
-                            if function.node_id == crashed_node_id:
-                                needs_new_placement = True
-                                break
-                
-                    if needs_new_placement:
-                        logger.info("Application %s needs a new placement", application.id)
-                        
-                        # update application status
-                        application.state = ApplicationState.CANCELED
-
-                        # trigger application functions
-                        for function_process in application.function_processes:
-                            if function_process.fun.state == FunctionState.RUNNING:
-                                function_process.action.interrupt()
-
-                        # release all resources of waiting functions
-                        for function_name in application.placement:
-                            function = application.placement[function_name]
-                            if function.state == FunctionState.WAITING:
-                                node_id = function.node_id
-                                node_obj = application.infrastructure_nodes[node_id]
-                                node_obj.release_resources(function.memory, function.v_cpu)
-
-                                logger.info("Application %s - Function %s has been canceled", application.id, function.id)
-                                function_process.fun.state = FunctionState.CANCELED
-
-                        # search for a new placement
-
-                        # save application file into default path
-                        application_path = os.path.join(g.applications_path, application.filename)
-                        shutil.copy(application_path, g.secfaas2fog_application_path)
-
-                        event = "node %s crashed" % crashed_node_id
-
-                        application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
-
-                        if application is not None:
-                            # launch application
-                            thread = Orchestrator("Placement", 2000 + step_number, env, application)
-                            thread.start()
-
-                            # add application into a list
-                            # this application must not be affected by the crash because
-                            # it has been just placed
-                            # so we add it in a temportary app list
-                            apps_just_added.append(application)                                           
-
-        if node_resurrected:
-
-            if crashed_node_id is not None:
-                # node which just crashed can't resurrect in the same epoch
-                resurrected_node_id = infrastructure.simulate_node_resurrection(crashed_node_id)
-            else:
-                resurrected_node_id = infrastructure.simulate_node_resurrection()
+                    # add event to the list
+                    event = {
+                        'type' : 'crash',
+                        'node_id' : crashed_node_id[category],
+                        'epoch' : step_number
+                    }
+                    node_events.append(event)
             
-            if resurrected_node_id is not None:
-                logger.info("Node %s resurrected", resurrected_node_id)
+            if node_resurrected:
+                if crashed_node_id[category] is not None:
+                    # node which just crashed can't resurrect in the same epoch
+                    resurrected_node_id = infrastructure.simulate_node_resurrection(NodeCategory.from_string(category), crashed_node_id[category])
+                else:
+                    resurrected_node_id = infrastructure.simulate_node_resurrection(NodeCategory.from_string(category))
+                
+                if resurrected_node_id is not None:
+                    logger.info("Node %s resurrected", resurrected_node_id)
 
-                # add event to the list
-                event = {
-                    'type' : 'resurrection',
-                    'node_id' : resurrected_node_id,
-                    'epoch' : step_number
-                }
-                node_events.append(event)
+                    # add event to the list
+                    event = {
+                        'type' : 'resurrection',
+                        'node_id' : resurrected_node_id,
+                        'epoch' : step_number
+                    }
+                    node_events.append(event)
 
+        crashed_nodes = list(crashed_node_id.values())
+
+        # there are affected applications?
+        for application in list_of_applications:
+
+            # completed apps are not interesting
+            if application.state == ApplicationState.COMPLETED:
+                continue
+
+            needs_new_placement = False
+            
+            # check if in the crashed node were deployed a function of this app
+            # check only waiting and running functions
+            for function_name in application.placement:
+                function = application.placement[function_name]
+                if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
+                    if function.node_id in crashed_nodes:
+                        
+                        # app need a new placement
+                        needs_new_placement = True
+                        break
+        
+            if needs_new_placement:
+                logger.info("Application %s needs a new placement", application.id)
+                
+                # update application status
+                application.state = ApplicationState.CANCELED
+
+                # trigger application functions
+                for function_process in application.function_processes:
+                    if function_process.fun.state == FunctionState.RUNNING:
+                        function_process.action.interrupt()
+
+                # release all resources of waiting functions
+                for function_name in application.placement:
+                    function = application.placement[function_name]
+                    if function.state == FunctionState.WAITING:
+                        node_id = function.node_id
+                        node_obj = application.infrastructure_nodes[node_id]
+                        node_obj.release_resources(function.memory, function.v_cpu)
+
+                        logger.info("Application %s - Function %s has been canceled", application.id, function.id)
+                        function_process.fun.state = FunctionState.CANCELED
+
+                # search for a new placement
+
+                # save application file into default path
+                application_path = os.path.join(g.applications_path, application.filename)
+                shutil.copy(application_path, g.secfaas2fog_application_path)
+
+                event = "node %s crashed" % crashed_node_id
+
+                application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
+
+                if application is not None:
+                    # launch application
+                    thread = Orchestrator("Placement", 2000 + step_number, env, application)
+                    thread.start()
+
+                    # add application into a list
+                    # this application must not be affected by the crash because
+                    # it has been just placed
+                    # so we add it in a temportary app list
+                    apps_just_added.append(application)                                           
+
+        # LINK crash
+        link_crashed = take_decision(config.link_crash_probability)
+
+        link_resurrected = take_decision(config.link_resurrection_probability)
 
         if link_crashed:
             first_node, second_node = infrastructure.simulate_link_crash()
@@ -470,8 +476,7 @@ def simulation(
                             # it has been just placed
                             # so we add it in a temportary app list
                             apps_just_added.append(application)                                           
-
-        
+     
         if link_resurrected:
 
             if first_node is not None and second_node is not None:

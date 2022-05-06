@@ -89,7 +89,7 @@ class FunctionProcess:
 
             # take the decision
             decision = take_decision(guard_probability)
-            #print("Function %s is a guard and its value is %s" % (self.fun.id, decision))
+            #print("Function %s is a guard and its value is %s (prob. of being True was %f)" % (self.fun.id, decision, guard_probability))
 
             taken_branch = ""
             discarded_branch = ""

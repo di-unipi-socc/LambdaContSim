@@ -1,9 +1,31 @@
-from math import inf, isinf
+from math import isinf
+from enum import Enum
 
 # class which represents an infrastracture node
 
+# TODO commenta
+class NodeCategory(Enum):
+    EDGE = 0
+    FOG = 1
+    CLOUD = 2
+
+    @staticmethod
+    def from_string(category_str : str):
+        
+        match category_str:
+            case 'cloud':
+                return NodeCategory.CLOUD
+            case 'fog':
+                return NodeCategory.FOG
+            case 'edge':
+                return NodeCategory.EDGE
+            case _:
+                return None
+
+
 class Node :
     id : str = '' # node unique identifier e.g. IP address
+    category : NodeCategory # node category (edge, fog, cloud)
     provider : str = '' # node's owner
     security_capabilites : list[str] = [] # list of security caps
     software_capabilites : list[str] = [] # list of software caps
@@ -14,6 +36,7 @@ class Node :
 
     # runtime fields
     available: bool = True
+
 
     def __init__(
         self, node_id : str,
@@ -31,6 +54,9 @@ class Node :
         self.memory = memory
         self.v_cpu = v_cpu
         self.mhz = mhz
+        # determine the node category
+        self.category = self._get_node_category()
+
 
     def take_resources(self, memory : int, v_cpu : int) :
         if not isinf(self.memory):
@@ -38,8 +64,25 @@ class Node :
         if not isinf(self.v_cpu):
             self.v_cpu -= v_cpu
 
+
     def release_resources(self, memory: int, v_cpu: int):
         if not isinf(self.memory):
             self.memory += memory
         if not isinf(self.v_cpu):
             self.v_cpu += v_cpu
+    
+
+    # internal function to determine the node category
+    def _get_node_category(self) -> NodeCategory:
+        # actually, we determine the node category by viewing its hardware capabilites
+        
+        # cloud nodes have infinite resources
+        if isinf(self.memory) and isinf(self.v_cpu) and isinf(self.mhz):
+            return NodeCategory.CLOUD
+
+        # if a node has poor resources, it SHOULD be an edge
+        # TODO encoded values
+        if self.memory <= 2000 or self.v_cpu <= 4:
+            return NodeCategory.EDGE
+        
+        return NodeCategory.FOG

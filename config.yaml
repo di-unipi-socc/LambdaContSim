@@ -3,8 +3,14 @@ silent_mode : false
 epochs : 100
 function_duration: 1
 infrastructure_filename: "infrastructure_0.pl"
-node_crash_probability : 0.1
-node_resurrection_probability : 0.3
+crash_probability :
+  cloud : 0.001
+  fog : 0.1
+  edge : 0.1
+resurrection_probability :
+  cloud : 0.5
+  fog : 0.2
+  edge : 0.9
 link_crash_probability : 0.05
 link_resurrection_probability : 0.3
 applications:

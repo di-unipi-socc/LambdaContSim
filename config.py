@@ -10,8 +10,8 @@ def parse_config(path):
     global num_of_epochs
     global function_duration
     global infrastructure_temp_path
-    global node_crash_probability
-    global node_resurrection_probability
+    global crash_probability
+    global resurrection_probability
     global link_crash_probability
     global link_resurrection_probability
     global applications
@@ -29,8 +29,13 @@ def parse_config(path):
         infrastructure_filename = config['infrastructure_filename']
         infrastructure_temp_path = os.path.join(g.infrastructures_path, infrastructure_filename)
 
-        node_crash_probability = config['node_crash_probability']
-        node_resurrection_probability = config['node_resurrection_probability']
+        # Node crash and resurrection probabilities
+
+        crash_probability = config['crash_probability']
+        resurrection_probability = config['resurrection_probability']
+
+        # Link crash and resurrection probabilities
+
         link_crash_probability = config['link_crash_probability']
         link_resurrection_probability = config['link_resurrection_probability']
         
