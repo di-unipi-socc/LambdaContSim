@@ -1,0 +1,135 @@
+nodes:
+  cloud:
+    - probability: 1
+      provider: cloudProvider
+      security_caps:
+        - pubKeyE
+        - antiTamp
+      software_caps:
+        - js
+        - py3
+        - numPy
+      hardware_caps:
+        memory: inf
+        v_cpu: inf
+        mhz: inf
+  fog:
+    - probability: 0.1
+      provider: university
+      security_caps:
+        - pubKeyE
+      software_caps:
+        - js
+        - py3
+      hardware_caps:
+        memory: 2048
+        v_cpu: 2
+        mhz: 2000
+    - probability: 0.05
+      provider: university
+      security_caps: []
+      software_caps:
+        - py3
+      hardware_caps:
+        memory: 1024
+        v_cpu: 2
+        mhz: 1000
+    - probability: 0.2
+      provider: university
+      security_caps:
+        - pubKeyE
+        - antiTamp
+      software_caps:
+        - py3
+        - numPy
+      hardware_caps:
+        memory: 4096
+        v_cpu: 4
+        mhz: 2000
+    - probability: 0.15
+      provider: telco
+      security_caps:
+        - pubKeyE
+      software_caps:
+        - py3
+        - numPy
+      hardware_caps:
+        memory: 2048
+        v_cpu: 4
+        mhz: 1500
+    - probability: 0.2
+      provider: telco
+      security_caps:
+        - pubKeyE
+        - antiTamp
+      software_caps:
+        - js
+        - py3
+      hardware_caps:
+        memory: 2048
+        v_cpu: 4
+        mhz: 1500
+    - probability: 0.3
+      provider: telco
+      security_caps:
+        - pubKeyE
+        - antiTamp
+      software_caps:
+        - js
+        - py3
+      hardware_caps:
+        memory: 3500
+        v_cpu: 16
+        mhz: 2000
+  edge:
+    - probability: 0.6
+      provider: privateCitizen1
+      security_caps: []
+      software_caps:
+        - js
+      hardware_caps:
+        memory: 1024
+        v_cpu: 4
+        mhz: 2500
+    - probability: 0.4
+      provider: privateCitizen2
+      security_caps:
+        - pubKeyE
+      software_caps:
+        - py3
+      hardware_caps:
+        memory: 512
+        v_cpu: 2
+        mhz: 1500
+
+
+latencies:
+  cloud:
+    cloud:
+      edge_probability: 1
+      lower: 30
+      upper: 55
+      # probability distribution???
+    fog:
+      edge_probability: 0.7
+      lower: 30
+      upper: 42
+    edge:
+      edge_probability: 0.1
+      lower: 35
+      upper: 45
+  fog:
+    fog:
+      edge_probability: 1
+      lower: 5
+      upper: 27
+    edge:
+      edge_probability: 0.95
+      lower: 5
+      upper: 21
+  edge:
+    edge:
+      edge_probability: 1
+      lower: 2
+      upper: 15
+      
