@@ -378,6 +378,7 @@ def simulation(
                 application_path = os.path.join(g.applications_path, application.filename)
                 shutil.copy(application_path, g.secfaas2fog_application_path)
 
+                # TODO sistema print
                 event = f"node(s) {[node for node in list(crashed_node_id.values())]} crashed"
 
                 application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
