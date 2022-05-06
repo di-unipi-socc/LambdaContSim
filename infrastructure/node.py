@@ -45,7 +45,8 @@ class Node :
         sw_caps : list[str],
         memory: int,
         v_cpu : int,
-        mhz : int
+        mhz : int,
+        category : NodeCategory = None
     ):
         self.id = node_id
         self.provider = provider
@@ -54,8 +55,12 @@ class Node :
         self.memory = memory
         self.v_cpu = v_cpu
         self.mhz = mhz
-        # determine the node category
-        self.category = self._get_node_category()
+        # use the provided category, if given
+        if category is not None:
+            self.category = category
+        else:
+            # determine ourselves the node category
+            self.category = self._get_node_category()
 
 
     def take_resources(self, memory : int, v_cpu : int) :
