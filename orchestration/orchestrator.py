@@ -7,10 +7,8 @@ from utils import get_ready_functions
 
 class Orchestrator(threading.Thread):
 
-    def __init__(self, thread_name, thread_ID, env : simpy.Environment, application : Application):
-        threading.Thread.__init__(self)
-        self.thread_name = thread_name
-        self.thread_ID = thread_ID
+    def __init__(self, env : simpy.Environment, application : Application):
+        super().__init__()
         self.env = env
         self.application = application
     

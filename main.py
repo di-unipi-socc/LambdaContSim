@@ -29,8 +29,8 @@ def print_usage():
     print('-c <config file> application config (default config.yaml)')
 
 
-# TODO commenta
 def load_infrastructure(infrastructure_filename : str) -> Infrastructure:
+    ''' Load the infrastructure from a file '''
     
     nodes : dict[str, Node] = {}
     latencies : dict[str, dict[str, ( int, bool )]] = {}
@@ -87,8 +87,9 @@ def load_infrastructure(infrastructure_filename : str) -> Infrastructure:
         return infrastructure
 
 
-# TODO commenta
 def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
+    ''' Dump infrastructure on a given file '''
+
     lines = []
 
     nodes = infrastructure.nodes
@@ -267,7 +268,7 @@ def simulation(
 
                     if application is not None:
                         # launch application
-                        thread = Orchestrator("Placement", 1000 + step_number, env, application)
+                        thread = Orchestrator(env, application)
                         thread.start()
 
                         # add application into a list
@@ -385,7 +386,7 @@ def simulation(
 
                 if application is not None:
                     # launch application
-                    thread = Orchestrator("Placement", 2000 + step_number, env, application)
+                    thread = Orchestrator(env, application)
                     thread.start()
 
                     # add application into a list
@@ -468,8 +469,7 @@ def simulation(
                         application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
 
                         if application is not None:
-                            # launch application TODO 2000 + ?? SISTEMA
-                            thread = Orchestrator("Placement", 2000 + step_number, env, application)
+                            thread = Orchestrator(env, application)
                             thread.start()
 
                             # add application into a list
