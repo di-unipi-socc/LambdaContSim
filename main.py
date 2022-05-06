@@ -280,6 +280,12 @@ def simulation(
 
         # CRASH/RESURRECTION PHASE
 
+        # reset variables
+        crashed_node_id = None
+        resurrected_node_id = None
+        first_node = None
+        second_node = None
+
         # node crash
         node_crashed = take_decision(config.node_crash_probability)
 
@@ -295,6 +301,7 @@ def simulation(
 
         if node_crashed:
             crashed_node_id = infrastructure.simulate_node_crash()
+            
             if crashed_node_id is not None:
                 logger.info("Node %s crashed", crashed_node_id)
                 
@@ -367,16 +374,21 @@ def simulation(
                             # so we add it in a temportary app list
                             apps_just_added.append(application)                                           
 
-        # TODO un nodo puo' risorgere anche se avviene crash di un altro
-        elif node_resurrected:
-            node_id = infrastructure.simulate_node_resurrection()
-            if node_id is not None:
-                logger.info("Node %s resurrected", node_id)
+        if node_resurrected:
+
+            if crashed_node_id is not None:
+                # node which just crashed can't resurrect in the same epoch
+                resurrected_node_id = infrastructure.simulate_node_resurrection(crashed_node_id)
+            else:
+                resurrected_node_id = infrastructure.simulate_node_resurrection()
+            
+            if resurrected_node_id is not None:
+                logger.info("Node %s resurrected", resurrected_node_id)
 
                 # add event to the list
                 event = {
                     'type' : 'resurrection',
-                    'node_id' : node_id,
+                    'node_id' : resurrected_node_id,
                     'epoch' : step_number
                 }
                 node_events.append(event)
@@ -384,6 +396,7 @@ def simulation(
 
         if link_crashed:
             first_node, second_node = infrastructure.simulate_link_crash()
+            
             if first_node != None and second_node != None:
                 logger.info("Link %s <-> %s crashed", first_node, second_node)
 
@@ -461,8 +474,15 @@ def simulation(
                             apps_just_added.append(application)                                           
 
         
-        elif link_resurrected:
-            first_node, second_node = infrastructure.simulate_link_resurrection()
+        if link_resurrected:
+
+            if first_node is not None and second_node is not None:
+                link_to_exclude = {'first' : first_node, 'second' : second_node}
+                # link which just crashed can't resurrect in the same epoch
+                first_node, second_node = infrastructure.simulate_link_resurrection(link_to_exclude)
+            else:
+                first_node, second_node = infrastructure.simulate_link_resurrection()
+
             if first_node != None and second_node != None:
                 logger.info("Link %s <-> %s resurrected", first_node, second_node)
 

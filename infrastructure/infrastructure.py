@@ -41,7 +41,12 @@ class Infrastructure :
         return node_to_kill
 
 
-    def simulate_node_resurrection(self) :
+    def simulate_node_resurrection(self, node_to_exclude = None) :
+
+        # remove the node so it can't be chosen for resurrection
+        if node_to_exclude is not None:
+            self.crashed_nodes.remove(node_to_exclude)
+
         # if there is no crashed nodes, then no one can resurrect
         if len(self.crashed_nodes) == 0:   
             return None
@@ -52,6 +57,10 @@ class Infrastructure :
         
         # remove from the list of crashed nodes
         self.crashed_nodes.remove(node_to_resurrect)
+
+        # re-insert the excluded node
+        if node_to_exclude is not None:
+            self.crashed_nodes.append(node_to_exclude)
         
         return node_to_resurrect
 
@@ -92,7 +101,12 @@ class Infrastructure :
             return first_node, second_node
 
 
-    def simulate_link_resurrection(self):
+    def simulate_link_resurrection(self, link_to_exclude = None):
+
+        # remove the link so it can't be chosen for resurrection
+        if link_to_exclude is not None:
+            self.crashed_links.remove(link_to_exclude)
+
         # if there are no crashed links, then we can't resurrect one
         if len(self.crashed_links) == 0:
             return None, None
@@ -105,6 +119,11 @@ class Infrastructure :
         
         # remove from the list of crashed links
         self.crashed_links.remove(link)
+
+        # re-insert the excluded link
+        if link_to_exclude is not None:
+            self.crashed_links.append(link_to_exclude)
+        
         
         return link['first'], link['second']
         
