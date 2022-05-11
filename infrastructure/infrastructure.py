@@ -24,7 +24,7 @@ class Infrastructure :
         # get the list of active nodes
         active_nodes = []
         for key in keys:
-            node = self.nodes.get(key)
+            node = self.nodes[key]
             if node.category == category and node.available:
                 active_nodes.append(key)
         
@@ -34,7 +34,7 @@ class Infrastructure :
         
         # choice a random node to kill
         node_to_kill = random.choice(active_nodes)
-        self.nodes.get(node_to_kill).available = False
+        self.nodes[node_to_kill].available = False
         
         # save into the list of crashed nodes
         self.crashed_nodes.append(node_to_kill)

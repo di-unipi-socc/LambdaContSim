@@ -115,11 +115,20 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     for line in infrastructure.other_data:
         lines.append(line)
     
+    # get crashed nodes
+    crashed_nodes = infrastructure.crashed_nodes
+    
     # write latencies informations
     first_keys = infrastructure.latencies.keys()
     for f_key in first_keys:
+        # don't write a link with a crashed node
+        if f_key in crashed_nodes:
+            continue
         first_key_links = infrastructure.latencies.get(f_key).keys()
         for s_key in first_key_links:
+            # don't write a link with a crashed node
+            if s_key in crashed_nodes:
+                continue
             latency = infrastructure.latencies.get(f_key).get(s_key)['latency']
             available = infrastructure.latencies.get(f_key).get(s_key)['available']
             # write iff link is available
@@ -151,15 +160,15 @@ def place_application(
     application_can_be_placed = False
     query = False
 
-    # save SecFaas2Fog starting time
-    start_time = datetime.now()
-
     with PrologMQI(prolog_path_args=[
             "-s", g.secfaas2fog_placer_path
     ]) as mqi:
         with mqi.create_thread() as prolog_thread:
 
             try:
+
+                # save SecFaas2Fog starting time
+                start_time = datetime.now()
             
                 query = prolog_thread.query(g.secfaas2fog_command)
             
@@ -330,6 +339,7 @@ def simulation(
                     node_events.append(event)
 
         crashed_nodes = list(crashed_node_id.values())
+        print(f"Non so {crashed_nodes}")
 
         # there are affected applications?
         for application in list_of_applications:
