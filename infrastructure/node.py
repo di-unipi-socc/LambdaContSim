@@ -45,22 +45,16 @@ class Node :
         sw_caps : list[str],
         memory: int,
         v_cpu : int,
-        mhz : int,
-        category : NodeCategory = None
+        mhz : int
     ):
         self.id = node_id
+        self.category = self._get_node_category() # determine ourselves the node category
         self.provider = provider
         self.security_capabilites = sec_caps
         self.software_capabilites = sw_caps
         self.memory = memory
         self.v_cpu = v_cpu
         self.mhz = mhz
-        # use the provided category, if given
-        if category is not None:
-            self.category = category
-        else:
-            # determine ourselves the node category
-            self.category = self._get_node_category()
 
 
     def take_resources(self, memory : int, v_cpu : int) :
@@ -79,15 +73,14 @@ class Node :
 
     # internal function to determine the node category
     def _get_node_category(self) -> NodeCategory:
-        # actually, we determine the node category by viewing its hardware capabilites
+        # actually, we determine the node category by viewing its name
+        # a cloud node contains 'cloud' into its name, and so on...
         
-        # cloud nodes have infinite resources
-        if isinf(self.memory) and isinf(self.v_cpu) and isinf(self.mhz):
+        if self.id.find("cloud") != -1:
             return NodeCategory.CLOUD
-
-        # if a node has poor resources, it SHOULD be an edge
-        # TODO hardcoded values, maybe we can do it better?
-        if self.memory <= 2000 or self.v_cpu <= 4:
-            return NodeCategory.EDGE
         
-        return NodeCategory.FOG
+        elif self.id.find("fog") != -1:
+            return NodeCategory.FOG
+        
+        # fallback is EDGE
+        return NodeCategory.EDGE
