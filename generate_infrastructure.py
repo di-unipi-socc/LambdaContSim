@@ -1,13 +1,17 @@
 import sys
 import random
+from matplotlib.style import available
 import yaml
 import networkx as nx
 import matplotlib.pyplot as pyplot
+from infrastructure.event_generator import EventGenerator
 from infrastructure.node import Node
 from math import inf
 import numpy
+from infrastructure.service import Service
 from logs import init_logger
 import os
+from infrastructure.infrastructure import Infrastructure
 
 
 def print_usage():
@@ -31,67 +35,14 @@ def get_config():
     return None
 
 
-def generate_infrastructure(argv):
+def generate_infrastructure():
 
-    # init the logger
-    logger = init_logger()
-
-    # if the user use ask for help, print application usage message
-    if ('-h' in argv or '--help' in argv):
-        print_usage()
-        return 0
-
-    # we should have 0 or at most 4 command line arguments (-c config)
-    if len(argv) not in [0, 2, 4]:
-        print_usage()
-        return 1
-
-    default_config_path = os.path.join(os.curdir, 'infrastructure_config.yaml')
-    config_path = default_config_path
-    default_output_path = os.path.join(os.curdir, 'test_set', 'infrastructures', 'infrastructure.pl')
-    output_path = default_output_path
-
-    # parse command line arguments
-    for i in range(0, len(argv) - 1, 2):
-        
-        option = argv[i]
-        option_value = argv[i + 1]
-        
-        if (option == '-c'):
-            # save into config_path variable
-            config_path = option_value
-        elif (option == '-o'):
-            # save into output_path variable
-            output_path = option_value
-        else:
-            # unknown option
-            logger.info("Unknown %s option", option)
-    
-    # check if the config path is a file
-    if not os.path.exists(config_path) or not os.path.isfile(config_path):
-        logger.error("Config path '%s' not exists or is not a file" % config_path)
-        logger.info("Fallback to default config file %s" % default_config_path)
-        config_path = default_config_path
-        # check that the default config exists
-        if not os.path.exists(config_path) or not os.path.isfile(config_path):
-            logger.critical("Default config path '%s' not exists or is not a file, exit..." % config_path)
-            print_usage()
-            return 1
-    
-    # check if the output path is not a directory
-    if not os.path.exists(output_path) or os.path.isdir(output_path):
-        logger.error("Output path '%s' not exists or is not a file" % output_path)
-        logger.info("Fallback to default output path %s" % default_output_path)
-        output_path = default_output_path
-    
+    # declare NetworkX graph
+    graph = nx.Graph()
 
     num_of_nodes = {}
 
     config = get_config()
-
-    if config is None:
-        # TODO log
-        return 1
     
     # load from config
     for category in ['cloud', 'fog', 'edge']:
@@ -122,9 +73,11 @@ def generate_infrastructure(argv):
         for node_id in chosen_nodes_ids:
             index += 1
             node = category_nodes[node_id]
+            node_id = category + str(index)
             
+            # create Node object
             node_obj = Node (
-                node_id = category + str(index),
+                node_id = node_id,
                 provider = node['provider'],
                 sec_caps = node['security_caps'],
                 sw_caps = node['software_caps'],
@@ -134,7 +87,8 @@ def generate_infrastructure(argv):
             )
             nodes[category].append(node_obj)
 
-    graph = nx.Graph()
+            # add the node to the graph
+            graph.add_node(node_id, available = True)
 
     # connect all nodes of same category
     edges = []
@@ -213,71 +167,60 @@ def generate_infrastructure(argv):
                 edges.append(edge)
     
 
-    graph.add_weighted_edges_from(edges)
-    graph_nodes = list(graph)
-
-    # populate Prolog file
-    lines = []
-
-    for category in nodes:
-        category_nodes = nodes[category]
-        for node in category_nodes:
-            
-            node_string = f"node({node.id}, {node.provider}, ["
-            for sec_cap in node.security_capabilites:
-                node_string += sec_cap + ","
-            node_string = node_string.removesuffix(",")
-            node_string += "], ["
-            for sw_cap in node.software_capabilites:
-                node_string += sw_cap + ","
-            node_string = node_string.removesuffix(",")
-            node_string += f"], ({str(node.memory)}, {str(node.v_cpu)}, {str(node.mhz)}))."
-            lines.append(node_string)
+    graph.add_weighted_edges_from(edges, available = True)
+    network_latencies = dict(nx.all_pairs_dijkstra_path_length(graph))
     
-    # event generator TODO sistema
-    for node in graph_nodes:
-        node = str(node)
-        if node.startswith('fog'):
-            if random.random() < 0.5:
-                lines.append(f'eventGenerator(userDevice, {node}).')
+    graph_nodes : list[str] = list(graph)
 
-    # offer services
-    for node in graph_nodes:
-        node = str(node)
-        if node.startswith('cloud'):
-            if random.random() < 0.5:
-                lines.append(f'service(cMaps, cloudProvider, maps, {node}).')
-        if node.startswith('fog'):
-            if random.random() < 0.5:
-                lines.append(f'service(myUserDb, appOp, userDB, {node}).')
-            if random.random() < 0.5:
-                lines.append(f'service(gp, pa, checkGp, {node}).')
-            if random.random() < 0.5:
-                lines.append(f'service(rules, pa, checkRules, {node}).')
-        if node.startswith('edge'):
-            if random.random() < 0.5:
-                lines.append(f'service(openM, openS, maps, {node}).')
-
-    lines.append('link(X,X,0).')
-    lines.append('link(X,Y,L) :- dif(X,Y), (latency(X,Y,L);latency(Y,X,L)).')
-
-    # latencies
-    results = dict(nx.all_pairs_dijkstra_path_length(graph))
-    for index in range(0, len(graph_nodes) - 1):
-        node1 = graph_nodes[index]
-        for index2 in range(index + 1, len(graph_nodes)):
-            node2 = graph_nodes[index2]
-            string = f'latency({node1}, {node2}, {results[node1][node2]}).'
-            lines.append(string)
+    # event generators
     
+    event_generators : list[EventGenerator] = []
+    min_num_generators = config['event_generators']['generators']['min_quantity']
+    max_num_generators = config['event_generators']['generators']['max_quantity']
+    num_of_generators = random.randint(min_num_generators, max_num_generators)
+    event_fog_probability = config['event_generators']['fog_probability']
+    event_edge_probability = config['event_generators']['edge_probability']
+    list_of_events = config['event_generators']['events']
+    generator_basename = config['event_generators']['generator_base_name']
+    for index in range(0, num_of_generators):
+        min_num_events = config['event_generators']['events_per_generator']['min_quantity']
+        max_num_events = config['event_generators']['events_per_generator']['max_quantity']
+        num_of_events = random.randint(min_num_events, max_num_events)
+        chosen_events = random.sample(
+            population = list_of_events,
+            k = num_of_events,
 
-    # overwrite file
-    with open(output_path, 'w') as f:
-        for line in lines:
-            f.write(line+'\n')
+        )
+        # TODO seleziona nodo
+        chosen_node = "fog4"
+        generator_name = generator_basename + str(index)
+        event_generator = EventGenerator(generator_name, chosen_events, chosen_node)
+        event_generators.append(event_generator)
+
+    # services
+    services : list[Service] = []
+    config_services = config['services']
+    index = 0
+
+    for node_id in graph_nodes:
+        # TODO remove category part
+        category = "edge"
+        if node_id.startswith("cloud"):
+            category = "cloud"
+        elif node_id.startswith("fog"):
+            category = "fog"
+        
+        services_by_category = config_services[category]
+
+        for service in services_by_category:
+            index += 1
+            service_id = service['base_name'] + str(index)
+            service = Service(service_id, service['provider'], service['type'], node_id)
+            services.append(service)
+
 
     # plot the graph
-
+    '''
     color_map = []
     for node in graph:
         node_str = str(node)
@@ -291,6 +234,18 @@ def generate_infrastructure(argv):
     pos = nx.spring_layout(graph, scale=20, k=3/numpy.sqrt(graph.order()))
     nx.draw(graph, pos = pos, font_size = 10, node_color = color_map, with_labels = True, node_size=1100)
     pyplot.show()
+    '''
+
+    nodes_dict : dict[str, Node] = {}
+
+    for category in ['edge', 'fog', 'cloud']:
+        nodes_by_cat = nodes[category]
+        for node in nodes_by_cat:
+            nodes_dict[node.id] = node
+
+    infrastructure : Infrastructure = Infrastructure(nodes_dict, graph, network_latencies, event_generators, services)
+
+    return infrastructure
 
 
 if __name__ == "__main__":

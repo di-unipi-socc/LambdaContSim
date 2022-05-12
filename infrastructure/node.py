@@ -5,12 +5,25 @@ from enum import Enum
 
 # a node can be edge, fog or cloud
 class NodeCategory(Enum):
-    EDGE = 0
-    FOG = 1
-    CLOUD = 2
+    EDGE = "edge"
+    FOG = "fog"
+    CLOUD = "cloud"
 
     @staticmethod
     def from_string(category_str : str):
+        
+        match category_str:
+            case 'cloud':
+                return NodeCategory.CLOUD
+            case 'fog':
+                return NodeCategory.FOG
+            case 'edge':
+                return NodeCategory.EDGE
+            case _:
+                return None
+    
+    @staticmethod
+    def to_string(category_str : str):
         
         match category_str:
             case 'cloud':
@@ -33,10 +46,6 @@ class Node :
     memory: int = 0
     v_cpu: int = 0
     mhz: int = 0
-
-    # runtime fields
-    available: bool = True
-
 
     def __init__(
         self, node_id : str,

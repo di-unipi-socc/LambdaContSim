@@ -9,7 +9,6 @@ def parse_config(path):
     global silent_mode
     global num_of_epochs
     global function_duration
-    global infrastructure_temp_path
     global crash_probability
     global resurrection_probability
     global link_crash_probability
@@ -25,9 +24,6 @@ def parse_config(path):
         silent_mode = config['silent_mode']
         num_of_epochs = config['epochs']
         function_duration = config['function_duration'] # TODO default 1
-        
-        infrastructure_filename = config['infrastructure_filename']
-        infrastructure_temp_path = os.path.join(g.infrastructures_path, infrastructure_filename)
 
         # Node crash and resurrection probabilities
 
@@ -38,10 +34,6 @@ def parse_config(path):
 
         link_crash_probability = config['link_crash_probability']
         link_resurrection_probability = config['link_resurrection_probability']
-        
-        
-        if not os.path.isfile(infrastructure_temp_path):
-            return False
         
         applications = config['applications']
 

@@ -6,6 +6,7 @@ import json
 from application.application import Application, ApplicationState
 from application.placed_function import FunctionState
 from config import parse_config
+from generate_infrastructure import generate_infrastructure
 from infrastructure.infrastructure import Infrastructure
 from infrastructure.node import Node, NodeCategory
 from math import inf
@@ -19,6 +20,7 @@ from placement import build_app_chain, parse_placement
 import simpy
 import global_variables as g
 from utils import take_decision
+import networkx as nx
 
 
 def print_usage():
@@ -29,64 +31,6 @@ def print_usage():
     print('-c <config file> application config (default config.yaml)')
 
 
-def load_infrastructure(infrastructure_filename : str) -> Infrastructure:
-    ''' Load the infrastructure from a file '''
-    
-    nodes : dict[str, Node] = {}
-    latencies : dict[str, dict[str, ( int, bool )]] = {}
-    
-    # TODO check errors on file opening
-    node_pattern = r'^node\(([^,]+),([^,]+),(\[.*?\]),(\[.*?\]),\(([^,]+),([^,]+),([^\)]+)\)\)\.*'
-    latency_pattern = r'^latency\(([^,]+),([^,]+),([^,]+)\)\.*'
-
-    other_lines = []
-
-    with open(infrastructure_filename, 'r') as f:
-        lines = f.readlines()
-
-        for line in lines:
-            if line.startswith('node'):
-                line = line.replace(' ', '')
-                # print(line)
-                match = re.match(node_pattern, line).groups()
-
-                node_id = match[0]
-                provider = match[1]
-                security_caps = match[2].replace('[','').replace(']','').split(',')
-                software_caps = match[3].replace('[','').replace(']','').split(',')
-                memory = inf if match[4] == 'inf' else int(match[4])
-                v_cpu = inf if match[5] == 'inf' else int(match[5])
-                mhz = inf if match[6] == 'inf' else int(match[6])
-
-                node = Node(node_id, provider, security_caps, software_caps, memory, v_cpu, mhz)
-                nodes[node_id] = node
-
-                # create latency index for the node
-                latencies[node_id] = {}
-
-            elif line.startswith('latency'):
-                line = line.replace(' ', '')
-                match = re.match(latency_pattern, line).groups()
-
-                first_node = match[0]
-                second_node = match[1]
-                latency = int(match[2])
-                
-                dictionary = latencies.get(first_node)
-                dictionary[second_node] = { 'latency' : latency, 'available' : True }
-
-            elif not line.startswith('%'):
-                # save other crucial informations
-                # discarding comments
-                other_lines.append(line)
-        
-        #print(other_lines)
-        # instance infrastructure
-        infrastructure = Infrastructure(nodes, latencies, other_lines)
-
-        return infrastructure
-
-
 def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     ''' Dump infrastructure on a given file '''
 
@@ -94,52 +38,68 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
 
     nodes = infrastructure.nodes
 
-    nodes_keys = nodes.keys()
-    for key in nodes_keys:
-        node = nodes[key]
+    graph_nodes = infrastructure.graph.nodes(data=True)
+    for (node_id, node_data) in graph_nodes:
+        node = nodes[node_id]
         # if the node is not available, don't write it
-        if node.available:
-            node_string = "node(" + node.id + ", " + node.provider + ", ["
+        if node_data['available']:
+            node_string = f"node({node.id}, {node.category.value}, {node.provider}, ["
             for sec_cap in node.security_capabilites:
-                node_string += sec_cap + ","
-            node_string = node_string.removesuffix(",")
+                node_string += sec_cap + ", "
+            node_string = node_string.removesuffix(", ")
             node_string += "], ["
             for sw_cap in node.software_capabilites:
-                node_string += sw_cap + ","
-            node_string = node_string.removesuffix(",")
-            node_string += "], (" + str(node.memory) + "," + str(node.v_cpu) + "," + str(node.mhz) + ")).\n"
-            #print(node_string)
+                node_string += sw_cap + ", "
+            node_string = node_string.removesuffix(", ")
+            node_string += f"], ({str(node.memory)}, {str(node.v_cpu)}, {str(node.mhz)}))."
             lines.append(node_string)
 
-    # write non-saved data into file
-    for line in infrastructure.other_data:
-        lines.append(line)
+    # event generators
+    for event_gen in infrastructure.event_generators:
+        string = f'eventGenerator({event_gen.generator_id}, ['
+        for event in event_gen.events:
+                string += event + ", "
+        string = string.removesuffix(", ")
+        string += f'], {event_gen.source_node}).'
+        lines.append(string)
+    
+    # services
+    for service in infrastructure.services:
+        string = f'service({service.id}, {service.provider}, {service.type}, {service.deployed_node}).'
+        lines.append(string)
+    
+    # TODO RIMUOVI
+    lines.append('service(myUserDb1, appOp, userDB, fog1).')
+
+    # we need these lines in order to declare links as unidirectionals
+    lines.append('link(X,X,0).')
+    lines.append('link(X,Y,L) :- dif(X,Y), (latency(X,Y,L);latency(Y,X,L)).')
     
     # get crashed nodes
     crashed_nodes = infrastructure.crashed_nodes
     
     # write latencies informations
-    first_keys = infrastructure.latencies.keys()
-    for f_key in first_keys:
+    graph_edges = infrastructure.graph.edges(data=True)
+    for (node1, node2, edge_data) in graph_edges:
         # don't write a link with a crashed node
-        if f_key in crashed_nodes:
+        if node1 in crashed_nodes:
             continue
-        first_key_links = infrastructure.latencies.get(f_key).keys()
-        for s_key in first_key_links:
-            # don't write a link with a crashed node
-            if s_key in crashed_nodes:
-                continue
-            latency = infrastructure.latencies.get(f_key).get(s_key)['latency']
-            available = infrastructure.latencies.get(f_key).get(s_key)['available']
-            # write iff link is available
-            if available:
-                latency_string = 'latency(' + f_key + ', ' + s_key + ', ' + str(latency) + ').\n'
-                lines.append(latency_string)
+        
+        # don't write a link with a crashed node
+        if node2 in crashed_nodes:
+            continue
+        
+        latency = infrastructure.latencies[node1][node2] # TODO edge_data['weight']
+        available = edge_data['available']
+        # write iff link is available
+        if available:
+            string = f'latency({node1}, {node2}, {latency}).'
+            lines.append(string)
 
     # overwrite file
     with open(output_filename, 'w') as f:
         for line in lines:
-            f.write(line)
+            f.write(line+'\n')
 
 
 def place_application(
@@ -339,7 +299,6 @@ def simulation(
                     node_events.append(event)
 
         crashed_nodes = list(crashed_node_id.values())
-        print(f"Non so {crashed_nodes}")
 
         # there are affected applications?
         for application in list_of_applications:
@@ -512,6 +471,9 @@ def simulation(
         # update list of applications
         list_of_applications += apps_just_added
 
+        # update infrastructure
+        infrastructure.update()
+
         # update infastructure.pl
         dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
@@ -586,11 +548,11 @@ def main(argv):
         logger.info("Silent mode is now active")
         logger.setLevel(logging.ERROR)
 
-    # save infrastructure file into default path
-    shutil.copy(config.infrastructure_temp_path, g.secfaas2fog_infrastructure_path)
-
     # instance infrastructure
-    infrastructure : Infrastructure = load_infrastructure(g.secfaas2fog_infrastructure_path)
+    infrastructure : Infrastructure = generate_infrastructure()
+
+    # save infrastructure file into default path
+    dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
     # SIMPY PHASE
     

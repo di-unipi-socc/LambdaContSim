@@ -1,10 +1,17 @@
+from infrastructure.event_generator import EventGenerator
 from infrastructure.node import Node, NodeCategory
 import random
+import networkx as nx
+
+from infrastructure.service import Service
 
 class Infrastructure :
     nodes : dict[str, Node]
-    latencies : dict[str, dict[str, ( int, bool )]]
-    other_data : list
+    original_graph : nx.Graph
+    graph : nx.Graph
+    latencies : dict[str, dict[str, int]]
+    event_generators : list[EventGenerator]
+    services : list[Service]
 
     # crashed nodes
     crashed_nodes = []
@@ -12,21 +19,24 @@ class Infrastructure :
     # link crashed
     crashed_links = []
 
-    def __init__(self, nodes, latencies, other_data):
+    def __init__(self, nodes, graph, latencies, event_generators, services):
         self.nodes = nodes
+        self.original_graph = graph
+        self.graph = graph
         self.latencies = latencies
-        self.other_data = other_data
+        self.event_generators = event_generators
+        self.services = services
 
 
     def simulate_node_crash(self, category : NodeCategory) :
-        keys = self.nodes.keys()
         
         # get the list of active nodes
+        graph_nodes = self.graph.nodes(data=True)
         active_nodes = []
-        for key in keys:
-            node = self.nodes[key]
-            if node.category == category and node.available:
-                active_nodes.append(key)
+        for (node_id, node_data) in graph_nodes:
+            node_obj = self.nodes[node_id]
+            if node_obj.category == category and node_data['available']:
+                active_nodes.append(node_id)
         
         # if there is no active nodes, then no one can crash
         if len(active_nodes) == 0:
@@ -34,7 +44,7 @@ class Infrastructure :
         
         # choice a random node to kill
         node_to_kill = random.choice(active_nodes)
-        self.nodes[node_to_kill].available = False
+        nx.set_node_attributes(self.graph, {node_id: { 'available' : False }})
         
         # save into the list of crashed nodes
         self.crashed_nodes.append(node_to_kill)
@@ -51,8 +61,8 @@ class Infrastructure :
         # get only nodes with the defined category
         category_crashed_nodes = []
         for node_id in self.crashed_nodes:
-            node = self.nodes.get(node_id)
-            if node.category == category:
+            node_obj = self.nodes.get(node_id)
+            if node_obj.category == category:
                 category_crashed_nodes.append(node_id)
 
         # if there is no crashed nodes, then no one can resurrect
@@ -61,7 +71,7 @@ class Infrastructure :
 
         # choose a node to resurrect
         node_to_resurrect = random.choice(category_crashed_nodes)
-        self.nodes.get(node_to_resurrect).available = True
+        nx.set_node_attributes(self.graph, {node_id: { 'available' : True }})
         
         # remove from the list of crashed nodes
         self.crashed_nodes.remove(node_to_resurrect)
@@ -74,39 +84,24 @@ class Infrastructure :
 
 
     def simulate_link_crash(self):
-        # get active nodes
-        keys = self.nodes.keys()
-        active_nodes = []
-        for key in keys:
-            if self.nodes.get(key).available:
-                active_nodes.append(key)
-        
-        # if there aren't then we can't make a link crash
-        if len(active_nodes) == 0:
+
+        # get the list of active links
+        active_links = [(node1, node2) for node1, node2, data in self.graph.edges(data=True) if data['available'] == True]
+
+        # if there aren't then we can't make no one link crash
+        if len(active_links) == 0:
             return None, None
+
+        # randomly choice a link to kill
+        node1, node2 = random.choice(active_links)
+
+        # make the link unavailable
+        nx.set_edge_attributes(self.graph, { (node1, node2) : { 'available' : False }})
         
-        # until we found an active link
-        while True:
-            
-            # choice a random node
-            first_node = random.choice(active_nodes)
-            second_keys = self.latencies.get(first_node).keys()
-            second_active_nodes = []
-            for key in second_keys:
-                if self.nodes.get(key).available:
-                    second_active_nodes.append(key)
-            if len(second_active_nodes) == 0:
-                return None, None
-            
-            second_node = random.choice(second_active_nodes)
-            
-            # make the link unavailable
-            self.latencies.get(first_node).get(second_node)['available'] = False
-            
-            # save into the list of crashed links
-            self.crashed_links.append({'first' : first_node, 'second' : second_node})
-            
-            return first_node, second_node
+        # save into the list of crashed links
+        self.crashed_links.append({'first' : node1, 'second' : node2})
+        
+        return node1, node2
 
 
     def simulate_link_resurrection(self, link_to_exclude = None):
@@ -123,7 +118,7 @@ class Infrastructure :
         link = random.choice(self.crashed_links)
         
         # make it available
-        self.latencies.get(link['first']).get(link['second'])['available'] = True
+        nx.set_edge_attributes(self.graph, { (link['first'], link['second']) : { 'available' : False }})
         
         # remove from the list of crashed links
         self.crashed_links.remove(link)
@@ -134,4 +129,14 @@ class Infrastructure :
         
         
         return link['first'], link['second']
+    
+
+    def update(self) :
+        filtered_nodes = [node for node, node_data in self.original_graph.nodes(data=True)
+                   if node_data['available'] == True]
         
+        new_graph : nx.Graph = self.original_graph.subgraph(filtered_nodes)
+        print(new_graph)
+
+        self.graph = new_graph
+        self.latencies = dict(nx.all_pairs_dijkstra_path_length(self.graph))

@@ -23,9 +23,9 @@ functionBehaviour(fAR, [U,Draw], [], [ScAr]):- maxType(U, Draw, ScAr).
 %               listOfFunctions(functionId(listOfServiceInstances), latencyFromPrevious)
 
 functionOrch(
-  arOrch,(userDevice, [top,low,medium]), %trigger
+  arOrch,(event1, [top,low,medium]), %trigger
   seq(
-    fun(fLogin,[myUserDb],25),
+    fun(fLogin,[myUserDb44],25),
     seq(
       par([
           if(

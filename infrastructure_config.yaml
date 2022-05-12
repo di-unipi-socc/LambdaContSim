@@ -108,7 +108,6 @@ nodes:
         v_cpu: 2
         mhz: 1500
 
-
 latencies:
   cloud:
     cloud:
@@ -138,4 +137,45 @@ latencies:
       edge_probability: 1
       lower: 2
       upper: 15
-      
+
+event_generators:
+  generator_base_name : device
+  generators:
+    min_quantity: 7
+    max_quantity: 10
+  events_per_generator:
+    min_quantity: 7
+    max_quantity: 7
+  fog_probability: 0.25
+  edge_probability: 0.75
+  events:
+    - event1
+    - event2
+    - event3
+    - event4
+    - event5
+    - event6
+    - event7
+
+services:
+  cloud:
+    - base_name: cMaps
+      provider: cloudProvider
+      type: maps
+    - base_name: bucket
+      provider: cloudProvider
+      type: bucket
+  fog:
+    - base_name: myUserDb
+      provider: appOp
+      type: userDB
+    - base_name: gp
+      provider: pa
+      type: checkGp
+    - base_name: rules
+      provider: pa
+      type: checkRules
+  edge:
+    - base_name: openM
+      provider: openS
+      type: maps

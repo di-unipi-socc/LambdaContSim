@@ -47,6 +47,6 @@ def init():
     # default config path
     default_config_path = os.path.join(os.curdir, 'config.yaml')
 
-    # SecFaas2Fog Prolog command
+    # SecFaas2Fog Prolog command TODO
     # once means that we take the first of the results
-    secfaas2fog_command = "once(secfaas2fog(OrchestrationId, Placement))."
+    secfaas2fog_command = "once(secfaas2fog(device1, arOrch, placement))."

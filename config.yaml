@@ -2,26 +2,21 @@ output_file : './report.json'
 silent_mode : false
 epochs : 100
 function_duration: 1
-infrastructure_filename: "infrastructure.pl"
 crash_probability :
   cloud : 0.001
-  fog : 0.1
+  fog : 0.05
   edge : 0.1
 resurrection_probability :
   cloud : 0.5
-  fog : 0.2
+  fog : 0.4
   edge : 0.9
 link_crash_probability : 0.05
 link_resurrection_probability : 0.3
 applications:
   #- path : path of application's Prolog definition
   #  placement_trigger_probability: probability of trigger placement of that application
-  "Application 0" :
+  "Siotec2022" :
     filename : application_0.pl
     placement_trigger_probability : 0.6
-    guards : {}
-  "Application 1" :
-    filename : application_1.pl
-    placement_trigger_probability : 0.4
     guards :
       fDCC : 0.7
