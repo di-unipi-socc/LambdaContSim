@@ -54,10 +54,12 @@ class Node :
         sw_caps : list[str],
         memory: int,
         v_cpu : int,
-        mhz : int
+        mhz : int,
+        category : NodeCategory = None
     ):
         self.id = node_id
-        self.category = self._get_node_category() # determine ourselves the node category
+        # if not given, determine ourselves the node category
+        self.category = category if category is not None else self._get_node_category()
         self.provider = provider
         self.security_capabilites = sec_caps
         self.software_capabilites = sw_caps

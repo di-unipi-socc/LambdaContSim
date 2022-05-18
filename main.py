@@ -1,4 +1,3 @@
-import re
 import sys
 from datetime import datetime
 from swiplserver import PrologError, PrologMQI
@@ -8,8 +7,7 @@ from application.placed_function import FunctionState
 from config import parse_config
 from generate_infrastructure import generate_infrastructure
 from infrastructure.infrastructure import Infrastructure
-from infrastructure.node import Node, NodeCategory
-from math import inf
+from infrastructure.node import NodeCategory
 import os
 import shutil
 import config
@@ -20,7 +18,6 @@ from placement import build_app_chain, parse_placement
 import simpy
 import global_variables as g
 from utils import take_decision
-import networkx as nx
 
 
 def print_usage():
@@ -67,9 +64,6 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     for service in infrastructure.services:
         string = f'service({service.id}, {service.provider}, {service.type}, {service.deployed_node}).'
         lines.append(string)
-    
-    # TODO RIMUOVI
-    lines.append('service(myUserDb1, appOp, userDB, fog1).')
 
     # we need these lines in order to declare links as unidirectionals
     lines.append('link(X,X,0).')
@@ -81,6 +75,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     # write latencies informations
     graph_edges = infrastructure.graph.edges(data=True)
     for (node1, node2, edge_data) in graph_edges:
+        
         # don't write a link with a crashed node
         if node1 in crashed_nodes:
             continue
@@ -89,7 +84,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
         if node2 in crashed_nodes:
             continue
         
-        latency = infrastructure.latencies[node1][node2] # TODO edge_data['weight']
+        latency = infrastructure.latencies[node1][node2]
         available = edge_data['available']
         # write iff link is available
         if available:

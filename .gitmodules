@@ -2,3 +2,4 @@
 	path = SecFaaS2Fog
 	url = https://github.com/alessiomatricardi/SecFaaS2Fog.git
 	branch = main
+	ignore = dirty

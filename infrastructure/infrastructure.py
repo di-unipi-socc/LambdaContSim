@@ -1,13 +1,12 @@
-from infrastructure.event_generator import EventGenerator
+from abc import ABC
 from infrastructure.node import Node, NodeCategory
-import random
-import networkx as nx
-
+from infrastructure.event_generator import EventGenerator
 from infrastructure.service import Service
+import networkx as nx
+import random
 
-class Infrastructure :
+class Infrastructure(ABC):
     nodes : dict[str, Node]
-    original_graph : nx.Graph
     graph : nx.Graph
     latencies : dict[str, dict[str, int]]
     event_generators : list[EventGenerator]
@@ -18,15 +17,6 @@ class Infrastructure :
 
     # link crashed
     crashed_links = []
-
-    def __init__(self, nodes, graph, latencies, event_generators, services):
-        self.nodes = nodes
-        self.original_graph = graph
-        self.graph = graph
-        self.latencies = latencies
-        self.event_generators = event_generators
-        self.services = services
-
 
     def simulate_node_crash(self, category : NodeCategory) :
         
@@ -44,7 +34,7 @@ class Infrastructure :
         
         # choice a random node to kill
         node_to_kill = random.choice(active_nodes)
-        nx.set_node_attributes(self.graph, {node_id: { 'available' : False }})
+        nx.set_node_attributes(self.graph, {node_to_kill: { 'available' : False }})
         
         # save into the list of crashed nodes
         self.crashed_nodes.append(node_to_kill)
@@ -65,20 +55,20 @@ class Infrastructure :
             if node_obj.category == category:
                 category_crashed_nodes.append(node_id)
 
+        # re-insert the excluded node
+        if node_to_exclude is not None:
+            self.crashed_nodes.append(node_to_exclude)
+
         # if there is no crashed nodes, then no one can resurrect
         if len(category_crashed_nodes) == 0:   
             return None
 
         # choose a node to resurrect
         node_to_resurrect = random.choice(category_crashed_nodes)
-        nx.set_node_attributes(self.graph, {node_id: { 'available' : True }})
+        nx.set_node_attributes(self.graph, {node_to_resurrect: { 'available' : True }})
         
         # remove from the list of crashed nodes
         self.crashed_nodes.remove(node_to_resurrect)
-
-        # re-insert the excluded node
-        if node_to_exclude is not None:
-            self.crashed_nodes.append(node_to_exclude)
         
         return node_to_resurrect
 
@@ -112,6 +102,9 @@ class Infrastructure :
 
         # if there are no crashed links, then we can't resurrect one
         if len(self.crashed_links) == 0:
+            # re-insert the excluded link
+            if link_to_exclude is not None:
+                self.crashed_links.append(link_to_exclude)
             return None, None
         
         # choice the link to resurrect
@@ -127,16 +120,6 @@ class Infrastructure :
         if link_to_exclude is not None:
             self.crashed_links.append(link_to_exclude)
         
-        
+
         return link['first'], link['second']
     
-
-    def update(self) :
-        filtered_nodes = [node for node, node_data in self.original_graph.nodes(data=True)
-                   if node_data['available'] == True]
-        
-        new_graph : nx.Graph = self.original_graph.subgraph(filtered_nodes)
-        #print(new_graph)
-
-        self.graph = new_graph
-        self.latencies = dict(nx.all_pairs_dijkstra_path_length(self.graph))

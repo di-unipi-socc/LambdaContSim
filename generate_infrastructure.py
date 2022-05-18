@@ -1,6 +1,5 @@
 import sys
 import random
-from matplotlib.style import available
 import yaml
 import networkx as nx
 import matplotlib.pyplot as pyplot
@@ -8,10 +7,10 @@ from infrastructure.event_generator import EventGenerator
 from infrastructure.node import Node
 from math import inf
 import numpy
+from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from infrastructure.service import Service
 from logs import init_logger
 import os
-from infrastructure.infrastructure import Infrastructure
 
 
 def print_usage():
@@ -166,8 +165,10 @@ def generate_infrastructure():
                 edge = (fog_node.id, chosed_node.id, distance)
                 edges.append(edge)
     
-
+    # add edges to the graph
     graph.add_weighted_edges_from(edges, available = True)
+    
+    # find shortest path lengths between nodes
     network_latencies = dict(nx.all_pairs_dijkstra_path_length(graph))
     
     graph_nodes : list[str] = list(graph)
@@ -202,13 +203,37 @@ def generate_infrastructure():
     config_services = config['services']
     index = 0
 
+    # TODO limita numero di servizi
     for node_id in graph_nodes:
+        if index > 20:
+            break
         # TODO remove category part
         category = "edge"
         if node_id.startswith("cloud"):
             category = "cloud"
         elif node_id.startswith("fog"):
             category = "fog"
+        
+        services_by_category = config_services[category]
+
+        for service in services_by_category:
+            index += 1
+            service_id = service['base_name'] + str(index)
+            service = Service(service_id, service['provider'], service['type'], node_id)
+            services.append(service)
+    
+    for node_id in graph_nodes:
+        if index > 25:
+            break
+        # TODO remove category part
+        category = "edge"
+        if node_id.startswith("cloud"):
+            category = "cloud"
+        elif node_id.startswith("fog"):
+            category = "fog"
+        
+        if category != 'edge':
+            continue
         
         services_by_category = config_services[category]
 
@@ -243,7 +268,7 @@ def generate_infrastructure():
         for node in nodes_by_cat:
             nodes_dict[node.id] = node
 
-    infrastructure : Infrastructure = Infrastructure(nodes_dict, graph, network_latencies, event_generators, services)
+    infrastructure = PhysicalInfrastructure(nodes_dict, graph, network_latencies, event_generators, services)
 
     return infrastructure
 
