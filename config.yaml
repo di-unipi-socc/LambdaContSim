@@ -2,7 +2,8 @@ simulator:
   output_file : './report.json'
   silent_mode : false
   epochs : 100
-  function_duration: 1
+  function_duration : 1
+  seed : 2345 # if seed is -1 then ignore it
 
 infrastructure:
   type: physical # allowed values are 'logical' and 'physical'

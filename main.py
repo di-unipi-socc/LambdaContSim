@@ -20,6 +20,7 @@ from placement import build_app_chain, parse_placement
 import simpy
 import global_variables as g
 from utils import take_decision
+import random
 
 
 def print_usage():
@@ -541,10 +542,14 @@ def main(argv):
     else:
         logger.info("Config correctly parsed")
     
-    # If silent mode is active don't show info messages but only errors and criticals
+    # if silent mode is active don't show info messages but only errors and criticals
     if config.sim_silent_mode:
         logger.info("Silent mode is now active")
         logger.setLevel(logging.ERROR)
+    
+    # Seed for deterministic execution
+    if config.sim_seed != -1:
+        random.seed(config.sim_seed)
     
     # Instance infrastructure
 

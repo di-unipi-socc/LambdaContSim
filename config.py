@@ -11,6 +11,7 @@ def parse_config(path):
     global sim_silent_mode
     global sim_num_of_epochs
     global sim_function_duration
+    global sim_seed
 
     # INFRASTRUCTURE
     global infr_type
@@ -34,7 +35,13 @@ def parse_config(path):
         sim_report_output_file = config['simulator']['output_file']
         sim_silent_mode = config['simulator']['silent_mode']
         sim_num_of_epochs = config['simulator']['epochs']
-        sim_function_duration = config['simulator']['function_duration'] # TODO default 1
+        sim_function_duration = config['simulator']['function_duration']
+
+        # check function duration
+        if sim_function_duration < 1:
+            sim_function_duration = 1
+
+        sim_seed = config['simulator']['seed']
 
         # INFRASTRUCTURE
 
