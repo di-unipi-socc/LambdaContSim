@@ -1,4 +1,0 @@
-[submodule "SecFaaS2Fog"]
-	path = SecFaaS2Fog
-	url = https://github.com/alessiomatricardi/SecFaaS2Fog.git
-	branch = main
