@@ -25,7 +25,7 @@ functionBehaviour(fAR, [U,Draw], [], [ScAr]):- maxType(U, Draw, ScAr).
 functionOrch(
   arOrch,(event1, [top,low,medium]), %trigger
   seq(
-    fun(fLogin,[myUserDb44],25),
+    fun(fLogin,[],25),
     seq(
       par([
           if(
@@ -54,9 +54,9 @@ latticeColor(medium,orange).
 latticeColor(top,green).
 
 % node labeling
-nodeLabel(NodeId, top)    :- node(NodeId,_,SecCaps,_,_), member(antiTamp, SecCaps), member(pubKeyE, SecCaps).
-nodeLabel(NodeId, medium) :- node(NodeId,_,SecCaps,_,_), \+(member(antiTamp, SecCaps)), member(pubKeyE, SecCaps).
-nodeLabel(NodeId, low)    :- node(NodeId,_,SecCaps,_,_), \+(member(pubKeyE, SecCaps)).
+nodeLabel(NodeId, top)    :- node(NodeId,_,_,SecCaps,_,_), member(antiTamp, SecCaps), member(pubKeyE, SecCaps).
+nodeLabel(NodeId, medium) :- node(NodeId,_,_,SecCaps,_,_), \+(member(antiTamp, SecCaps)), member(pubKeyE, SecCaps).
+nodeLabel(NodeId, low)    :- node(NodeId,_,_,SecCaps,_,_), \+(member(pubKeyE, SecCaps)).
 
 %service labeling
 serviceLabel(SId, _, top) :- service(SId, appOp, _, _).

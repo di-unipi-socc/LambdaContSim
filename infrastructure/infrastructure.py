@@ -136,7 +136,7 @@ class Infrastructure :
                    if node_data['available'] == True]
         
         new_graph : nx.Graph = self.original_graph.subgraph(filtered_nodes)
-        print(new_graph)
+        #print(new_graph)
 
         self.graph = new_graph
         self.latencies = dict(nx.all_pairs_dijkstra_path_length(self.graph))

@@ -49,4 +49,4 @@ def init():
 
     # SecFaas2Fog Prolog command TODO
     # once means that we take the first of the results
-    secfaas2fog_command = "once(secfaas2fog(device1, arOrch, placement))."
+    secfaas2fog_command = "once(secfaas2fog(device1, arOrch, Placement))."

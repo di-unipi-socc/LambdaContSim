@@ -16,7 +16,8 @@ applications:
   #- path : path of application's Prolog definition
   #  placement_trigger_probability: probability of trigger placement of that application
   "Siotec2022" :
-    filename : application_0.pl
+    filename : siotec.pl
     placement_trigger_probability : 0.6
     guards :
       fDCC : 0.7
+  
