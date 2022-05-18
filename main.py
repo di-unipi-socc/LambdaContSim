@@ -16,7 +16,7 @@ from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from orchestration.orchestrator import Orchestrator
 import logs
 import logging
-from placement import build_app_chain, parse_placement
+from placement import PlacementType, build_app_chain, get_placement_query, parse_placement
 import simpy
 import global_variables as g
 from utils import take_decision
@@ -101,11 +101,11 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
 
 
 def place_application(
-    application_name : str,
-    application_filename : str,
-    event : str,
-    infrastructure : Infrastructure,
-    applications_stats : dict,
+        application_name : str,
+        application_filename : str,
+        event : str,
+        infrastructure : Infrastructure,
+        applications_stats : dict,
     ):
 
     # get the logger
@@ -116,7 +116,11 @@ def place_application(
     # it will reply with a valid placement iff application can be placed
     raw_placement = None
     application_can_be_placed = False
-    query = False
+    query_result = False
+
+    # get query to execute TODO sistema
+    query = get_placement_query(PlacementType.PADDED_PLACEMENT, 'device1', 'BOH')
+    print(query)
 
     with PrologMQI(prolog_path_args=[
             "-s", g.secfaas2fog_placer_path
@@ -128,7 +132,7 @@ def place_application(
                 # save SecFaas2Fog starting time
                 start_time = datetime.now()
             
-                query = prolog_thread.query(g.secfaas2fog_command)
+                query_result = prolog_thread.query(query)
             
             except PrologError:
                 logger.error("Prolog execution failed")
@@ -137,9 +141,9 @@ def place_application(
                 # save SecFaas2Fog finish time
                 end_time = datetime.now()
 
-    if query != False and isinstance(query, list):
+    if query_result != False and isinstance(query_result, list):
                     
-        raw_placement = query[0] # it is a dictionary
+        raw_placement = query_result[0] # it is a dictionary
 
         application_chain = build_app_chain(raw_placement)
         placement = parse_placement(raw_placement)
@@ -211,38 +215,58 @@ def simulation(
         # we can place an application iff there is almost one active node
         if len(infrastructure.nodes) > len(infrastructure.crashed_nodes):
 
-            # for each application
-            for application_name in config.applications:
+            # applications to place
+            triggered_apps : list[str] = []
 
-                app = config.applications[application_name]
+            # for each event generator
+            for event_generator in infrastructure.event_generators:
+
+                # generator is triggering? TODO probability for generator??
+                trig_events = take_decision(0.4)
+
+                if trig_events:
+                    logger.info(f'Generator {event_generator.generator_id} triggered')
+
+                    # get the list of triggered events
+                    triggered_events = event_generator.events
+
+                    # for each application, check if it is triggered by one of these events
+                    for application_name in config.applications:
+
+                        application = config.applications[application_name]
+
+                        if application['trigger_event'] in triggered_events:
+                            # ensure that an application triggered by multiple events will be placed one time per epoch
+                            if application_name not in triggered_apps:
+
+                                # add to the list
+                                triggered_apps.append(application_name)
+
+                                # try to place the application
+                                logger.info("Placement triggered for application %s", application_name)
+                                
+                                # get application path
+                                application_filename = application['filename']
+                                application_path = os.path.join(g.applications_path, application_filename)
+
+                                # save application file into default path
+                                shutil.copy(application_path, g.secfaas2fog_application_path)
+
+                                # place
+                                event = "trigger"
+                                application = place_application(application_name, application_filename, event, infrastructure, applications_stats)
+
+                                if application is not None:
+                                    # launch application
+                                    thread = Orchestrator(env, application)
+                                    thread.start()
+
+                                    # add application into a list
+                                    list_of_applications.append(application)
+
+                                # update infastructure.pl
+                                dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
                 
-                # we want to trigger a new placement request?
-                trigger = take_decision(app['placement_trigger_probability'])
-                
-                # get application path
-                application_filename = app['filename']
-                application_path = os.path.join(g.applications_path, application_filename)
-
-                if trigger:
-                    logger.info("Placement triggered for application %s", application_name)
-
-                    # save application file into default path
-                    shutil.copy(application_path, g.secfaas2fog_application_path)
-
-                    # place
-                    event = "trigger"
-                    application = place_application(application_name, application_filename, event, infrastructure, applications_stats)
-
-                    if application is not None:
-                        # launch application
-                        thread = Orchestrator(env, application)
-                        thread.start()
-
-                        # add application into a list
-                        list_of_applications.append(application)
-
-                # update infastructure.pl
-                dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # CRASH/RESURRECTION PHASE
 
@@ -349,7 +373,13 @@ def simulation(
                 # TODO sistema print
                 event = f"node(s) {[node for node in list(crashed_node_id.values())]} crashed"
 
-                application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
+                application = place_application(
+                    application.id, 
+                    application.filename, 
+                    event, 
+                    infrastructure, 
+                    applications_stats
+                )
 
                 if application is not None:
                     # launch application
@@ -433,7 +463,13 @@ def simulation(
 
                         event = "link %s <-> %s crashed" % (first_node, second_node)
 
-                        application = place_application(application.id, application.filename, event, infrastructure, applications_stats)
+                        application = place_application(
+                            application.id, 
+                            application.filename, 
+                            event, 
+                            infrastructure, 
+                            applications_stats
+                        )
 
                         if application is not None:
                             thread = Orchestrator(env, application)

@@ -1,4 +1,20 @@
 from application.placed_function import PlacedFunction
+from enum import Enum
+
+# types of placements
+
+class PlacementType(Enum):
+    PADDED_PLACEMENT = "paddedPlacement"
+    NO_PAD_PLACEMENT = "nonPaddedPlacement"
+    REPLACEMENT = "replacement"
+
+
+def get_placement_query(placement_type : PlacementType, generator_id : str, orchestration_id : str) -> str:
+    '''Get the query to execute based on the placement type'''
+
+    if placement_type == PlacementType.PADDED_PLACEMENT:
+        # once means that we take the first of the results
+        return f'once(secfaas2fog({generator_id}, {orchestration_id}, Placement)).'
 
 # function used to parse prolog placement
 

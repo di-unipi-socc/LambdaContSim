@@ -12,7 +12,6 @@ infrastructures_path = ""
 applications_path = ""
 default_config_path = ""
 generated_infrastructure_path = ""
-secfaas2fog_command = ""
 
 def init():
     """ This should only be called once by the main module
@@ -31,7 +30,6 @@ def init():
     global applications_path
     global default_config_path
     global generated_infrastructure_path
-    global secfaas2fog_command
 
     # define where SecFaas2Fog is
     import os
@@ -51,7 +49,3 @@ def init():
 
     # where we save the generated infrastructure file
     generated_infrastructure_path = os.path.join(os.curdir, 'generated_infrastructure.pl')
-
-    # SecFaas2Fog Prolog command TODO
-    # once means that we take the first of the results
-    secfaas2fog_command = "once(secfaas2fog(device1, arOrch, Placement))."

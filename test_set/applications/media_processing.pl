@@ -19,7 +19,7 @@ functionBehaviour(fArchive, [Head,Value],[],[Head,Value]).
 %               listOfFunctions(functionId(listOfServiceInstances), latencyFromPrevious)
 
 functionOrch(
-  mediaOrch,(event02, [low,top,medium]), %trigger
+  mediaOrch,(event2, [low,top,medium]), %trigger
   seq(fun(fDocAnalysis,[],220),
     seq(fun(fProcDoc,[],200),
         if(fun(fPayAppr,[],180), fun(fNotify,[],220),fun(fArchive,[],200))

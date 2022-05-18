@@ -21,11 +21,10 @@ infrastructure:
   link_resurrection_probability : 0.3
 
 applications:
-  #- path : path of application's Prolog definition
-  #  placement_trigger_probability: probability of trigger placement of that application
   "Siotec2022" :
-    filename : siotec.pl
-    placement_trigger_probability : 0.6
+    filename : siotec.pl # application's Prolog definition
+    orchestration_id: arOrch # orchestration id
+    trigger_event: event1 # trigger event
     guards :
       fDCC : 0.7
   
