@@ -1,17 +1,24 @@
-output_file : './report.json'
-silent_mode : false
-epochs : 100
-function_duration: 1
-crash_probability :
-  cloud : 0.001
-  fog : 0.05
-  edge : 0.1
-resurrection_probability :
-  cloud : 0.5
-  fog : 0.4
-  edge : 0.9
-link_crash_probability : 0.05
-link_resurrection_probability : 0.3
+simulator:
+  output_file : './report.json'
+  silent_mode : false
+  epochs : 100
+  function_duration: 1
+
+infrastructure:
+  type: physical # allowed values are 'logical' and 'physical'
+  filename: simple_infrastructure.pl
+  is_dynamic: true # iff the infrastructure is dynamic, nodes and links can crash
+  crash_probability :
+    cloud : 0.001
+    fog : 0.05
+    edge : 0.1
+  resurrection_probability :
+    cloud : 0.5
+    fog : 0.4
+    edge : 0.9
+  link_crash_probability : 0.05
+  link_resurrection_probability : 0.3
+
 applications:
   #- path : path of application's Prolog definition
   #  placement_trigger_probability: probability of trigger placement of that application

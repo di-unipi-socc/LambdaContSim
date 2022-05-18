@@ -11,6 +11,7 @@ secfaas2fog_infrastructure_path = ""
 infrastructures_path = ""
 applications_path = ""
 default_config_path = ""
+generated_infrastructure_path = ""
 secfaas2fog_command = ""
 
 def init():
@@ -29,6 +30,7 @@ def init():
     global infrastructures_path
     global applications_path
     global default_config_path
+    global generated_infrastructure_path
     global secfaas2fog_command
 
     # define where SecFaas2Fog is
@@ -46,6 +48,9 @@ def init():
 
     # default config path
     default_config_path = os.path.join(os.curdir, 'config.yaml')
+
+    # where we save the generated infrastructure file
+    generated_infrastructure_path = os.path.join(os.curdir, 'generated_infrastructure.pl')
 
     # SecFaas2Fog Prolog command TODO
     # once means that we take the first of the results

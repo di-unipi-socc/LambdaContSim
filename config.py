@@ -4,15 +4,24 @@ import global_variables as g
 
 def parse_config(path):
     
-    # app global variables
-    global report_output_file
-    global silent_mode
-    global num_of_epochs
-    global function_duration
-    global crash_probability
-    global resurrection_probability
-    global link_crash_probability
-    global link_resurrection_probability
+    # config variables
+
+    # SIMULATOR
+    global sim_report_output_file
+    global sim_silent_mode
+    global sim_num_of_epochs
+    global sim_function_duration
+
+    # INFRASTRUCTURE
+    global infr_type
+    global infr_filename
+    global infr_is_dynamic
+    global infr_node_crash_probability
+    global infr_node_resurrection_probability
+    global infr_link_crash_probability
+    global infr_link_resurrection_probability
+    
+    # APPLICATIONS
     global applications
 
     with open(path, 'r') as f:
@@ -20,20 +29,58 @@ def parse_config(path):
         # load config yaml file into a dictionary
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-        report_output_file = config['output_file']
-        silent_mode = config['silent_mode']
-        num_of_epochs = config['epochs']
-        function_duration = config['function_duration'] # TODO default 1
+        # SIMULATOR
 
-        # Node crash and resurrection probabilities
+        sim_report_output_file = config['simulator']['output_file']
+        sim_silent_mode = config['simulator']['silent_mode']
+        sim_num_of_epochs = config['simulator']['epochs']
+        sim_function_duration = config['simulator']['function_duration'] # TODO default 1
 
-        crash_probability = config['crash_probability']
-        resurrection_probability = config['resurrection_probability']
+        # INFRASTRUCTURE
 
-        # Link crash and resurrection probabilities
+        infr_type = config['infrastructure']['type']
+        if not infr_type in ['physical', 'logical']:
+            # TODO error message
+            return False
+        
+        # if the infrastructur is logical, we need to take it from a Prolog file
+        if infr_type == 'logical':
+            infr_temp_filename = config['infrastructure']['filename']
+            infr_filename = os.path.join(g.infrastructures_path, infr_temp_filename)
+        else:
+            infr_filename = ''
+        
+        infr_is_dynamic = config['infrastructure']['is_dynamic']
 
-        link_crash_probability = config['link_crash_probability']
-        link_resurrection_probability = config['link_resurrection_probability']
+        if infr_is_dynamic:
+
+            # Node crash and resurrection probabilities
+
+            infr_node_crash_probability = config['infrastructure']['crash_probability']
+            infr_node_resurrection_probability = config['infrastructure']['resurrection_probability']
+
+            # Link crash and resurrection probabilities
+
+            infr_link_crash_probability = config['infrastructure']['link_crash_probability']
+            infr_link_resurrection_probability = config['infrastructure']['link_resurrection_probability']
+        else:
+
+            # infrastructure is static -> no crashes or resurrections
+
+            infr_node_crash_probability = {
+                'edge' : 0,
+                'fog' : 0,
+                'cloud' : 0
+            }
+            infr_node_resurrection_probability = {
+                'edge' : 0,
+                'fog' : 0,
+                'cloud' : 0
+            }
+            infr_link_crash_probability = 0
+            infr_link_resurrection_probability = 0
+
+        # APPLICATIONS
         
         applications = config['applications']
 

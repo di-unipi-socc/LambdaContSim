@@ -137,4 +137,7 @@ dmypy.json
 # JSON files
 *.json
 
+# Project output files
+*infrastructure.pl
+
 # ADD HERE FILES AND FOLDERS TO BE IGNORED

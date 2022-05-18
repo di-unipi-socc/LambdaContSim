@@ -1,22 +1,22 @@
 %% AR GATHERING INFRASTRUCTURE (info provided by node provider(s) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % node(nodeId, providerId, listOfSupportedSecurityProperties,listOFSoftwareCapabilities, listOFHWcapabilities (memory, cpu, mhz), Price)
 %privateCitzen
-node(private1, privateCitizen1, [], [js], (1024,4,2500)).
-node(private2, privateCitizen2, [pubKeyE], [py3], (512,2,1500)).
+node(private1, edge, privateCitizen1, [], [js], (1024,4,2500)).
+node(private2, edge, privateCitizen2, [pubKeyE], [py3], (512,2,1500)).
 %telco
-node(ispRouter, telco, [pubKeyE, antiTamp], [js,py3],(3500, 16, 2000)).
-node(antenna1, telco, [pubKeyE, antiTamp], [js,py3],(2048, 3, 1500)).
-node(antenna2, telco, [pubKeyE], [py3,numPy],(2048, 4, 1500)).
+node(ispRouter, fog, telco, [pubKeyE, antiTamp], [js,py3],(3500, 16, 2000)).
+node(antenna1, fog, telco, [pubKeyE, antiTamp], [js,py3],(2048, 3, 1500)).
+node(antenna2, fog, telco, [pubKeyE], [py3,numPy],(2048, 4, 1500)).
 %university
-node(labServer, university, [pubKeyE, antiTamp], [py3,numPy],(4096, 4, 2000)).
-node(officeServer, university, [], [py3],(1024, 2, 1000)).
-node(switch, university, [pubKeyE], [py3,js],(2048, 2, 2000)).
+node(labServer, fog, university, [pubKeyE, antiTamp], [py3,numPy],(4096, 4, 2000)).
+node(officeServer, fog, university, [], [py3],(1024, 2, 1000)).
+node(switch, fog, university, [pubKeyE], [py3,js],(2048, 2, 2000)).
 %cloudProvider
-node(cloudNode, cloudProvider, [pubKeyE,antiTamp], [js,py3,numPy], (inf, inf, inf)).
+node(cloudNode, cloud, cloudProvider, [pubKeyE,antiTamp], [js,py3,numPy], (inf, inf, inf)).
 
 
 %eventGenerator(generatorId, eventType, SourceNodes)
-eventGenerator(userDevice, ispRouter).
+eventGenerator(device1, [event1], ispRouter).
 
 %service(serviceId, serviceProvider, serviceType, deployedNode)
 service(myUserDb, appOp, userDB, ispRouter).

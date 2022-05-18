@@ -7,10 +7,12 @@ from application.placed_function import FunctionState
 from config import parse_config
 from generate_infrastructure import generate_infrastructure
 from infrastructure.infrastructure import Infrastructure
+from infrastructure.logical_infrastructure import LogicalInfrastructure
 from infrastructure.node import NodeCategory
 import os
 import shutil
 import config
+from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from orchestration.orchestrator import Orchestrator
 import logs
 import logging
@@ -249,15 +251,15 @@ def simulation(
         first_node = None
         second_node = None
         
-        # TODO commenta
+        # list of replacing applications
         apps_just_added : list[Application] = []
 
         # NODE crash
         for category in ['cloud', 'fog', 'edge']:
             
-            node_crashed = take_decision(config.crash_probability[category])
+            node_crashed = take_decision(config.infr_node_crash_probability[category])
 
-            node_resurrected = take_decision(config.resurrection_probability[category])
+            node_resurrected = take_decision(config.infr_node_resurrection_probability[category])
 
             crashed_node_id[category] = None
 
@@ -360,9 +362,9 @@ def simulation(
                     apps_just_added.append(application)                                           
 
         # LINK crash
-        link_crashed = take_decision(config.link_crash_probability)
+        link_crashed = take_decision(config.infr_link_crash_probability)
 
-        link_resurrected = take_decision(config.link_resurrection_probability)
+        link_resurrected = take_decision(config.infr_link_resurrection_probability)
 
         if link_crashed:
             first_node, second_node = infrastructure.simulate_link_crash()
@@ -466,13 +468,14 @@ def simulation(
         # update list of applications
         list_of_applications += apps_just_added
 
-        # update infrastructure
-        infrastructure.update()
+        # recalculate all paths between nodes of the physical infrastructure
+        if type(infrastructure) is PhysicalInfrastructure:
+            infrastructure.recalculate_routes()
 
         # update infastructure.pl
         dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
-        # make 1 step
+        # make 1 step of simulation
         yield env.timeout(1)
 
 
@@ -539,15 +542,33 @@ def main(argv):
         logger.info("Config correctly parsed")
     
     # If silent mode is active don't show info messages but only errors and criticals
-    if(config.silent_mode):
+    if config.sim_silent_mode:
         logger.info("Silent mode is now active")
         logger.setLevel(logging.ERROR)
+    
+    # Instance infrastructure
 
-    # instance infrastructure
-    infrastructure : Infrastructure = generate_infrastructure()
+    infrastructure : Infrastructure
 
-    # save infrastructure file into default path
-    dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
+    if config.infr_type == 'physical':
+        logger.info("Infrastructure generation is starting")
+
+        # randomly generate the infrastructure
+        infrastructure = generate_infrastructure()
+
+        # save infrastructure file into default path
+        dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
+
+        logger.info(f"Infrastructure generated, it will be saved into the root directory")
+        shutil.copy(g.secfaas2fog_infrastructure_path, g.generated_infrastructure_path)
+    
+    else:
+
+        # load infrastructure from the Prolog file
+        infrastructure = LogicalInfrastructure.loads(config.infr_filename)
+
+        # save infrastructure file into default path
+        shutil.copy(config.infr_filename, g.secfaas2fog_infrastructure_path)
 
     # SIMPY PHASE
     
@@ -555,10 +576,10 @@ def main(argv):
     env = simpy.Environment()
 
     # start simulation
-    env.process(simulation(env, config.num_of_epochs, infrastructure, applications_stats, node_events, link_events))
+    env.process(simulation(env, config.sim_num_of_epochs, infrastructure, applications_stats, node_events, link_events))
 
-    # we simulate for num_of_epochs epochs
-    env.run(until=config.num_of_epochs)
+    # we simulate for sim_num_of_epochs epochs
+    env.run(until=config.sim_num_of_epochs)
 
     # STATISTICS
 
@@ -613,9 +634,9 @@ def main(argv):
     logger.info("Average time of SecFaas2Fog placement: " + str(float(f'{global_sum/global_number_of_placements:.2f}')) + " milliseconds")
     logger.info("Successess: %d" % global_successes)
 
-    logger.info("Writing JSON's execution report on '%s'", config.report_output_file)
+    logger.info("Writing JSON's execution report on '%s'", config.sim_report_output_file)
 
-    with open(config.report_output_file, 'w') as file:
+    with open(config.sim_report_output_file, 'w') as file:
         json.dump(stats_to_dump, indent = 4, default = str, fp = file)
 
     logger.info("Work done! Byee :)")

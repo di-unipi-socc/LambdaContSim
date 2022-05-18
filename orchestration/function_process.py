@@ -30,7 +30,7 @@ class FunctionProcess:
         try:
             
             # simulate the function execution
-            yield self.env.timeout(config.function_duration)
+            yield self.env.timeout(config.sim_function_duration)
 
         except simpy.Interrupt:
             logger.info("Application %s - Function %s has been interrupted", self.application.id, self.fun.id)
