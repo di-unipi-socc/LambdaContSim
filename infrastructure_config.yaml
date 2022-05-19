@@ -141,13 +141,12 @@ latencies:
 event_generators:
   generator_base_name : device
   generators:
-    min_quantity: 7
-    max_quantity: 10
+    min_quantity: 2
+    max_quantity: 5
   events_per_generator:
-    min_quantity: 7
-    max_quantity: 7
-  fog_probability: 0.25
-  edge_probability: 0.75
+    min_quantity: 2
+    max_quantity: 4
+  on_edge_probability: 0.75
   events:
     - event1
     - event2
@@ -169,6 +168,9 @@ services:
     - base_name: myUserDb
       provider: appOp
       type: userDB
+    - base_name: myDatabase
+      provider: appOp
+      type: database
     - base_name: gp
       provider: pa
       type: checkGp

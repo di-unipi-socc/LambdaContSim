@@ -1,34 +1,34 @@
 %%AR GATHERING APPLICATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-% functionReqs(functionId, listOfSWReqs, HWReqs(memory, vCPU, Htz), timeout, listOfServiceReqs(serviceType, latency))
-functionReqs(fDocAnalysis, [py3], (1024, 2, 500), [(bucket, 160)]).
-functionReqs(fProcDoc, [js], (1024, 1, 800), [userDB, 210]).
-functionReqs(fPayAppr, [py3], (256, 2, 400), []).
-functionReqs(fNotify, [py3], (128, 2, 500), []).
-functionReqs(fArchive, [py3], (256, 2, 500), []).
+% functionReqs(functionId, listOfSWReqs, HWReqs(memory, vCPU, Htz), listOfServiceReqs(serviceType, latency))
+functionReqs(fCheck, [py3], (512, 2, 500), [(database, 200)]).
+functionReqs(fBuyOrSell, [py3], (2048, 4, 1200), []).
+functionReqs(fSell, [js, py3], (256, 2, 400), []).
+functionReqs(fBuy, [js, py3], (256, 2, 400), []).
+functionReqs(fRecord, [py3], (1600, 2, 500), [(database, 200)]).
 
 %functionBehaviour(functionId, listOfInputs, listOfun(serviceReq, TypeParam), listOfOutputs)
-functionBehaviour(fDocAnalysis, [Head,User,Value],[Head],[Head,User,Value]).
-functionBehaviour(fProcDoc, [Head,User,Value],[User],[Head,Value]).
-functionBehaviour(fPayAppr, [Head,Value],[],[Head,Value]).
-functionBehaviour(fNotify, [Head,Value],[],[Res,low]):- maxType(Head, Value, Res). 
-functionBehaviour(fArchive, [Head,Value],[],[Head,Value]).                              
+functionBehaviour(fCheck, [Stock, Value],[Stock],[Stock, Value]).
+functionBehaviour(fBuyOrSell, [Stock, Value],[],[Stock, Value]).
+functionBehaviour(fSell, [Stock, Value],[],[Stock, Value]).
+functionBehaviour(fBuy, [Stock, Value],[],[Stock, Value]).
+functionBehaviour(fRecord, [_, Value],[],[Value]).     
 
 %functionOrch(functionOrchId, operatorId, triggeringEvent(eventSource, eventType, inputParameters), (latency from source, dest)
 %               listOfFunctions(functionId(listOfServiceInstances), latencyFromPrevious)
 
 functionOrch(
-  mediaOrch,(event2, [low,top,medium]), %trigger
+  stockOrch,(event2, [top,low,medium]), %trigger
   seq(
-    fun(fDocAnalysis,[],220),
+    fun(fCheck,[],250),
     seq(
-      fun(fProcDoc,[],200),
       if(
-        fun(fPayAppr,[],180),
-        fun(fNotify,[],220),
-        fun(fArchive,[],200)
-      )
+          fun(fBuyOrSell,[],150),
+          fun(fSell,[],105),
+          fun(fBuy,[],180)
+      ),
+      fun(fRecord,[],180)
     )
   )
 ).
@@ -51,10 +51,8 @@ nodeLabel(NodeId, low)    :- node(NodeId,_,_,SecCaps,_,_), \+(member(pubKeyE, Se
 %service labeling
 serviceLabel(SId, _, top) :- service(SId, appOp, _, _).
 serviceLabel(SId, _, top) :- service(SId, pa, _, _).
-serviceLabel(SId, _, top) :- service(SId, cloudProvider, Stype, _), \+(Stype == maps).
 serviceLabel(SId, maps, medium) :- service(SId, cloudProvider, maps, _).
 serviceLabel(SId, Type, low) :- 
     service(SId, Provider, Type, _),
     \+(Provider == appOp),
-    \+(Provider == pa),
-    \+(Provider == cloudProvider).
+    \+((Provider == cloudProvider, Type == maps)).

@@ -2,15 +2,14 @@ import sys
 import random
 import yaml
 import networkx as nx
-import matplotlib.pyplot as pyplot
 from infrastructure.event_generator import EventGenerator
 from infrastructure.node import Node
 from math import inf
 import numpy
 from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from infrastructure.service import Service
-from logs import init_logger
 import os
+from utils import take_decision
 
 
 def print_usage():
@@ -49,7 +48,7 @@ def generate_infrastructure():
     
     config_nodes = config['nodes']
 
-    nodes : dict[str, list[Node]] = {}
+    nodes_by_category : dict[str, list[Node]] = {}
 
     # choice nodes
 
@@ -64,9 +63,7 @@ def generate_infrastructure():
             k = num_of_nodes[category]
         )
 
-        #print(chosen_nodes_ids)
-
-        nodes[category] = []
+        nodes_by_category[category] = []
 
         index = 0
         for node_id in chosen_nodes_ids:
@@ -84,7 +81,7 @@ def generate_infrastructure():
                 v_cpu = inf if node['hardware_caps']['v_cpu'] == 'inf' else int(node['hardware_caps']['v_cpu']),
                 mhz = inf if node['hardware_caps']['mhz'] == 'inf' else int(node['hardware_caps']['mhz'])
             )
-            nodes[category].append(node_obj)
+            nodes_by_category[category].append(node_obj)
 
             # add the node to the graph
             graph.add_node(node_id, available = True)
@@ -96,7 +93,7 @@ def generate_infrastructure():
         lower_latency = config['latencies'][category][category]['lower']
         upper_latency = config['latencies'][category][category]['upper']
         
-        category_nodes = nodes[category]
+        category_nodes = nodes_by_category[category]
         for index in range(0, len(category_nodes) - 1):
             first = category_nodes[index].id
             for index2 in range(index+1, len(category_nodes)):
@@ -106,11 +103,11 @@ def generate_infrastructure():
                 edges.append(edge)
     
     # connect cloud with fog and edge nodes
-    cloud_nodes : list[Node] = nodes['cloud']
+    cloud_nodes : list[Node] = nodes_by_category['cloud']
 
     for category in ['fog', 'edge']:
 
-        category_nodes : list[Node] = nodes[category]
+        category_nodes : list[Node] = nodes_by_category[category]
 
         latencies = config['latencies']['cloud'][category]
         edge_probability = latencies['edge_probability']
@@ -136,11 +133,11 @@ def generate_infrastructure():
                 edges.append(edge)
     
     # connect fog with edge nodes
-    fog_nodes : list[Node] = nodes['fog']
+    fog_nodes : list[Node] = nodes_by_category['fog']
 
     for category in ['edge']:
 
-        category_nodes : list[Node] = nodes[category]
+        category_nodes : list[Node] = nodes_by_category[category]
 
         latencies = config['latencies']['fog'][category]
         edge_probability = latencies['edge_probability']
@@ -176,26 +173,37 @@ def generate_infrastructure():
     # event generators
     
     event_generators : list[EventGenerator] = []
+    
     min_num_generators = config['event_generators']['generators']['min_quantity']
     max_num_generators = config['event_generators']['generators']['max_quantity']
     num_of_generators = random.randint(min_num_generators, max_num_generators)
-    event_fog_probability = config['event_generators']['fog_probability']
-    event_edge_probability = config['event_generators']['edge_probability']
+    
+    event_on_edge_probability = config['event_generators']['on_edge_probability']
+    
     list_of_events = config['event_generators']['events']
     generator_basename = config['event_generators']['generator_base_name']
-    for index in range(0, num_of_generators):
+    
+    for index in range(1, num_of_generators + 1):
+        
         min_num_events = config['event_generators']['events_per_generator']['min_quantity']
         max_num_events = config['event_generators']['events_per_generator']['max_quantity']
         num_of_events = random.randint(min_num_events, max_num_events)
+        
+        # select the list of events
         chosen_events = random.sample(
             population = list_of_events,
             k = num_of_events,
-
         )
-        # TODO seleziona nodo
-        chosen_node = "fog4"
+        
+        # choose the node
+        generator_on_edge = take_decision(event_on_edge_probability)
+        generator_node_category = 'edge' if generator_on_edge else 'fog'
+        chosen_node = random.choice(nodes_by_category[generator_node_category])
+        chosen_node_id = chosen_node.id
+        
+        # create the generator
         generator_name = generator_basename + str(index)
-        event_generator = EventGenerator(generator_name, chosen_events, chosen_node)
+        event_generator = EventGenerator(generator_name, chosen_events, chosen_node_id)
         event_generators.append(event_generator)
 
     # services
@@ -205,7 +213,7 @@ def generate_infrastructure():
 
     # TODO limita numero di servizi
     for node_id in graph_nodes:
-        if index > 20:
+        if index > 10:
             break
         # TODO remove category part
         category = "edge"
@@ -223,7 +231,7 @@ def generate_infrastructure():
             services.append(service)
     
     for node_id in graph_nodes:
-        if index > 25:
+        if index > 15:
             break
         # TODO remove category part
         category = "edge"
@@ -264,7 +272,7 @@ def generate_infrastructure():
     nodes_dict : dict[str, Node] = {}
 
     for category in ['edge', 'fog', 'cloud']:
-        nodes_by_cat = nodes[category]
+        nodes_by_cat = nodes_by_category[category]
         for node in nodes_by_cat:
             nodes_dict[node.id] = node
 

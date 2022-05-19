@@ -3,7 +3,7 @@ simulator:
   silent_mode : false
   epochs : 100
   function_duration : 1
-  seed : 2345 # if seed is -1 then ignore it
+  seed : -1 # if seed is -1 then ignore it
 
 infrastructure:
   type: physical # allowed values are 'logical' and 'physical'
@@ -27,4 +27,14 @@ applications:
     trigger_event: event1 # trigger event
     guards :
       fDCC : 0.7
+  "Media Processing" :
+    filename : media_processing.pl
+    orchestration_id: mediaOrch
+    trigger_event: event2
+    guards :
+      fPayAppr : 0.4
+  "Stock Market" :
+    filename : stock_market.pl
+    orchestration_id: stockOrch
+    trigger_event: event2
   
