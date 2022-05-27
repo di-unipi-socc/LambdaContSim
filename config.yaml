@@ -37,4 +37,5 @@ applications:
     filename : stock_market.pl
     orchestration_id: stockOrch
     trigger_event: event2
+    guards : {}
   
