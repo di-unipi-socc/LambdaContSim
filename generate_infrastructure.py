@@ -11,6 +11,7 @@ from infrastructure.service import Service
 import os
 from utils import take_decision
 from matplotlib import pyplot
+import config as general_config
 
 
 def print_usage():
@@ -196,6 +197,15 @@ def generate_infrastructure():
             population = list_of_events,
             k = num_of_events,
         )
+
+        # define a probability that each event will be triggered by that device
+        events_with_probability = []
+        for event in chosen_events:
+            event_probability = random.uniform(
+                general_config.event_min_probability,
+                general_config.event_max_probability
+            )
+            events_with_probability.append((event, event_probability))
         
         # choose the node
         generator_on_edge = take_decision(event_on_edge_probability)
@@ -205,7 +215,7 @@ def generate_infrastructure():
         
         # create the generator
         generator_name = generator_basename + str(index)
-        event_generator = EventGenerator(generator_name, chosen_events, chosen_node_id)
+        event_generator = EventGenerator(generator_name, events_with_probability, chosen_node_id)
         event_generators.append(event_generator)
 
     # services

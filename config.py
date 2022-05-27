@@ -12,6 +12,12 @@ def parse_config(path):
     global sim_num_of_epochs
     global sim_function_duration
     global sim_seed
+    global sim_use_padding
+
+    # EVENTS
+    global event_generator_trigger_probability
+    global event_min_probability
+    global event_max_probability
 
     # INFRASTRUCTURE
     global infr_type
@@ -42,6 +48,13 @@ def parse_config(path):
             sim_function_duration = 1
 
         sim_seed = config['simulator']['seed']
+        sim_use_padding = config['simulator']['use_padding']
+
+        # EVENTS
+
+        event_generator_trigger_probability = config['events']['generator_trigger_probability']
+        event_min_probability = config['events']['event_min_probability']
+        event_max_probability = config['events']['event_max_probability']
 
         # INFRASTRUCTURE
 

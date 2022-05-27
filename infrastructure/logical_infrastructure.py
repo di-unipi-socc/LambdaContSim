@@ -5,6 +5,8 @@ from infrastructure.service import Service
 import re
 from math import inf
 import networkx as nx
+import config
+import random
 
 class LogicalInfrastructure(Infrastructure) :
 
@@ -86,12 +88,22 @@ class LogicalInfrastructure(Infrastructure) :
 
                     generator_id = match[0]
                     events = match[1].replace('[','').replace(']','').split(',')
+
+                    # define a probability that each event will be triggered by that device
+                    events_with_probability = []
+                    for event in events:
+                        event_probability = random.uniform(
+                            config.event_min_probability,
+                            config.event_max_probability
+                        )
+                        events_with_probability.append((event, event_probability))
+
                     node_id = match[2]
 
                     # instance object
                     event_gen = EventGenerator(
                         id = generator_id,
-                        events = events,
+                        events = events_with_probability,
                         source_node = node_id
                     )
                     # append to the list

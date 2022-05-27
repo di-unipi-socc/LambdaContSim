@@ -5,16 +5,23 @@ from enum import Enum
 
 class PlacementType(Enum):
     PADDED_PLACEMENT = "paddedPlacement"
-    NO_PAD_PLACEMENT = "nonPaddedPlacement"
+    UNPADDED_PLACEMENT = "unPaddedPlacement"
     REPLACEMENT = "replacement"
 
 
-def get_placement_query(placement_type : PlacementType, generator_id : str, orchestration_id : str) -> str:
+def get_placement_query(placement_type : PlacementType, orchestration_id : str, generator_id : str = None, starting_function : str = None, starting_node : str = None) -> (str | None):
     '''Get the query to execute based on the placement type'''
 
     if placement_type == PlacementType.PADDED_PLACEMENT:
         # once means that we take the first of the results
         return f'once(secfaas2fog({generator_id}, {orchestration_id}, Placement)).'
+    elif placement_type == PlacementType.UNPADDED_PLACEMENT:
+        return f'once(noPad({generator_id}, {orchestration_id}, Placement)).'
+    elif placement_type == PlacementType.REPLACEMENT:
+        return f'once(replacement({starting_function}, {starting_node}, {orchestration_id}, Placement)).'
+
+    return None
+
 
 # function used to parse prolog placement
 

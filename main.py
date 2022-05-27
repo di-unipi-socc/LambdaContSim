@@ -57,7 +57,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     # event generators
     for event_gen in infrastructure.event_generators:
         string = f'eventGenerator({event_gen.generator_id}, ['
-        for event in event_gen.events:
+        for event, _ in event_gen.events:
                 string += event + ", "
         string = string.removesuffix(", ")
         string += f'], {event_gen.source_node}).'
@@ -76,23 +76,20 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     crashed_nodes = infrastructure.crashed_nodes
     
     # write latencies informations
-    graph_edges = infrastructure.graph.edges(data=True)
-    for (node1, node2, edge_data) in graph_edges:
-        
+    latencies = infrastructure.latencies
+    for node1 in latencies.keys():
         # don't write a link with a crashed node
         if node1 in crashed_nodes:
             continue
-        
-        # don't write a link with a crashed node
-        if node2 in crashed_nodes:
-            continue
-        
-        latency = infrastructure.latencies[node1][node2]
-        available = edge_data['available']
-        # write iff link is available
-        if available:
-            string = f'latency({node1}, {node2}, {latency}).'
-            lines.append(string)
+        node2list : dict = latencies[node1]
+        for node2 in node2list.keys():
+            # don't write a link with a crashed node
+            if node2 in crashed_nodes:
+                continue
+            # don't write a crashed link TODO
+            if True:
+                string = f'latency({node1}, {node2}, {latencies[node1][node2]}).'
+                lines.append(string)
 
     # overwrite file
     with open(output_filename, 'w') as f:
@@ -100,27 +97,45 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
             f.write(line+'\n')
 
 
-def place_application(
-        application_name : str,
-        application_filename : str,
-        event : str,
-        infrastructure : Infrastructure,
-        applications_stats : dict,
-    ):
-
-    # get the logger
+def get_raw_placement(placement_type : PlacementType, orchestration_id : str, generator_id : str = None, starting_function : str = None, starting_node : str = None):
+    '''
+    Returns the application placement found by SecFaas2Fog.
+    Returns a 3-tuple (placement, execution start, execution end):
+    placement is None if query is not good
+    placement is an empty dictionary if the application cannot be placed
+    placement is a valid dictionary if the application can be placed
+    '''
+    
     logger = logs.get_logger()
 
+    # prepare the query
+    query = ""
+
+    # if we need a replacement, we have to pass starting function and starting node
+    if placement_type == PlacementType.REPLACEMENT:
+        query = get_placement_query(
+            placement_type=placement_type,
+            orchestration_id=orchestration_id,
+            starting_function=starting_function,
+            starting_node=starting_node
+        )
+    elif placement_type == PlacementType.PADDED_PLACEMENT or placement_type == PlacementType.UNPADDED_PLACEMENT:
+        query = get_placement_query(
+            placement_type=placement_type,
+            orchestration_id=orchestration_id,
+            generator_id=generator_id
+        )
+    
+    #print(query)
+    
+    if query is None:
+        return None, None, None
+    
     # try to place this app with SecFaas2Fog
 
     # it will reply with a valid placement iff application can be placed
     raw_placement = None
-    application_can_be_placed = False
     query_result = False
-
-    # get query to execute TODO sistema
-    query = get_placement_query(PlacementType.PADDED_PLACEMENT, 'device1', 'BOH')
-    print(query)
 
     with PrologMQI(prolog_path_args=[
             "-s", g.secfaas2fog_placer_path
@@ -144,7 +159,44 @@ def place_application(
     if query_result != False and isinstance(query_result, list):
                     
         raw_placement = query_result[0] # it is a dictionary
+        
+        return raw_placement, start_time, end_time
+    
+    return {}, start_time, end_time
+    
 
+def place_application(
+    application_name : str,
+    application_filename : str,
+    generator_id : str,
+    infrastructure : Infrastructure,
+    applications_stats : dict,
+):
+
+    # get the logger
+    logger = logs.get_logger()
+
+    # application should be padded?
+    placement_type = PlacementType.PADDED_PLACEMENT
+    if not config.sim_use_padding:
+        placement_type = PlacementType.UNPADDED_PLACEMENT
+
+    # try to place this app with SecFaas2Fog
+
+    # it will reply with a valid placement iff application can be placed
+    raw_placement, start_time, end_time = get_raw_placement(
+        placement_type=placement_type,
+        orchestration_id=config.applications[application_name]['orchestration_id'],
+        generator_id=generator_id
+    )
+
+    application_can_be_placed = False
+
+    if raw_placement is None:
+        logger.critical("Query is None")  
+    elif raw_placement == {}:
+        logger.info("Placement failed for %s", application_name)
+    else:
         application_chain = build_app_chain(raw_placement)
         placement = parse_placement(raw_placement)
         
@@ -154,8 +206,6 @@ def place_application(
         application_can_be_placed = True
 
         logger.info("Placement found for %s", application_name)
-    else:
-        logger.info("Placement failed for %s", application_name)
 
     if application_name not in applications_stats.keys():
         applications_stats[application_name] = {}
@@ -163,7 +213,7 @@ def place_application(
 
     # normal placement
     placement_data : dict = {
-        'event' : event,
+        'event' : f'{generator_id} triggered',
         'start' : start_time,
         'end' : end_time,
         'success' : application_can_be_placed
@@ -190,6 +240,14 @@ def place_application(
     return None
 
 
+def replace_application(
+    orchestration_id : str,
+    starting_function : str,
+    starting_node : str
+):
+    pass
+
+
 def simulation(
     env : simpy.Environment,
     steps : int,
@@ -212,23 +270,24 @@ def simulation(
 
         # PLACEMENT PHASE
 
-        # we can place an application iff there is almost one active node
-        if len(infrastructure.nodes) > len(infrastructure.crashed_nodes):
+        # for each event generator
+        for event_generator in infrastructure.event_generators:
 
-            # applications to place
-            triggered_apps : list[str] = []
+                # generator is triggering?
+                generator_triggered = take_decision(config.event_generator_trigger_probability)
 
-            # for each event generator
-            for event_generator in infrastructure.event_generators:
-
-                # generator is triggering? TODO probability for generator??
-                trig_events = take_decision(0.4)
-
-                if trig_events:
+                if generator_triggered:
                     logger.info(f'Generator {event_generator.generator_id} triggered')
 
                     # get the list of triggered events
-                    triggered_events = event_generator.events
+                    triggered_events = []
+                    for event, event_probability in event_generator.events:
+                        
+                        # event of that generator is triggering?
+                        event_triggered = take_decision(event_probability)
+
+                        if event_triggered:
+                            triggered_events.append(event)
 
                     # for each application, check if it is triggered by one of these events
                     for application_name in config.applications:
@@ -236,36 +295,30 @@ def simulation(
                         application = config.applications[application_name]
 
                         if application['trigger_event'] in triggered_events:
-                            # ensure that an application triggered by multiple events will be placed one time per epoch
-                            if application_name not in triggered_apps:
 
-                                # add to the list
-                                triggered_apps.append(application_name)
+                            # try to place the application
+                            logger.info(f"Event {application['trigger_event']} ({event_generator.generator_id}) triggered {application_name}")
+                            
+                            # get application path
+                            application_filename = application['filename']
+                            application_path = os.path.join(g.applications_path, application_filename)
 
-                                # try to place the application
-                                logger.info("Placement triggered for application %s", application_name)
-                                
-                                # get application path
-                                application_filename = application['filename']
-                                application_path = os.path.join(g.applications_path, application_filename)
+                            # save application file into default path
+                            shutil.copy(application_path, g.secfaas2fog_application_path)
 
-                                # save application file into default path
-                                shutil.copy(application_path, g.secfaas2fog_application_path)
+                            # place
+                            application = place_application(application_name, application_filename, event_generator.generator_id, infrastructure, applications_stats)
 
-                                # place
-                                event = "trigger"
-                                application = place_application(application_name, application_filename, event, infrastructure, applications_stats)
+                            if application is not None:
+                                # launch application
+                                thread = Orchestrator(env, application)
+                                thread.start()
 
-                                if application is not None:
-                                    # launch application
-                                    thread = Orchestrator(env, application)
-                                    thread.start()
+                                # add application into a list
+                                list_of_applications.append(application)
 
-                                    # add application into a list
-                                    list_of_applications.append(application)
-
-                                # update infastructure.pl
-                                dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
+                            # update infastructure.pl
+                            dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
                 
 
         # CRASH/RESURRECTION PHASE
@@ -569,10 +622,10 @@ def main(argv):
             return 1
     
     # parse the config file
-    config_has_parsed = parse_config(config_path)
+    parsing_succeed = parse_config(config_path)
 
-    if not config_has_parsed:
-        logger.critical("Config parsing failed") # TODO devo stamparlo qui?
+    if not parsing_succeed:
+        logger.critical("Config parsing failed")
         print_usage()
         return 1
     else:
@@ -640,6 +693,8 @@ def main(argv):
         num_of_placements = len(application['placements'])
         successes = 0
         sum = 0
+        success_sum = 0
+        failure_sum = 0
 
         placement_results = application['placements']
         
@@ -647,15 +702,21 @@ def main(argv):
             
             end_millisec = result['end'].timestamp() * 1000
             start_millisec = result['start'].timestamp() * 1000
-            sum += end_millisec - start_millisec
+            exec_time = end_millisec - start_millisec
+            sum += exec_time
             
             if result['success'] :
+                success_sum += exec_time
                 successes += 1
+            else:
+                failure_sum += exec_time
         
         # enrich application stats
         application['num_of_placements'] = num_of_placements
         application['successes'] = successes
-        application['average_secfaas2fog_execution'] = float(f'{sum/num_of_placements}')
+        application['average_time_execution'] = float(f'{sum/num_of_placements}')
+        application['average_success_time_execution'] = 0 if successes == 0 else float(f'{success_sum/successes}')
+        application['average_failure_time_execution'] = 0 if successes == num_of_placements else float(f'{failure_sum/(num_of_placements-successes)}')
 
         # accumulate global variables
         global_number_of_placements += num_of_placements

@@ -1,6 +1,6 @@
 class EventGenerator :
     generator_id : str
-    events : list[str]
+    events : list[(str, float)]
     source_node : str
 
     def __init__(self, id, events, source_node) :
