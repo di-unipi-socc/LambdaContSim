@@ -65,4 +65,5 @@ serviceLabel(SId, maps, medium) :- service(SId, cloudProvider, maps, _).
 serviceLabel(SId, Type, low) :- 
     service(SId, Provider, Type, _),
     \+(Provider == appOp),
+    \+(Provider == pa),
     \+((Provider == cloudProvider, Type == maps)).

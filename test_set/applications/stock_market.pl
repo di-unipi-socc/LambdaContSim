@@ -9,8 +9,8 @@ functionReqs(fBuy, [js, py3], (256, 2, 400), []).
 functionReqs(fRecord, [py3], (1600, 2, 500), [(database, 200)]).
 
 %functionBehaviour(functionId, listOfInputs, listOfun(serviceReq, TypeParam), listOfOutputs)
-functionBehaviour(fCheck, [Stock, Value],[Stock],[Stock, Value]).
-functionBehaviour(fBuyOrSell, [Stock, Value],[],[Stock, Value]).
+functionBehaviour(fCheck, [Stock, Value, Purchase],[Stock],[Stock, Value, Purchase]).
+functionBehaviour(fBuyOrSell, [Stock, Value, Purchase],[],[Stock, Value]).
 functionBehaviour(fSell, [Stock, Value],[],[Stock, Value]).
 functionBehaviour(fBuy, [Stock, Value],[],[Stock, Value]).
 functionBehaviour(fRecord, [_, Value],[],[Value]).     
@@ -19,7 +19,7 @@ functionBehaviour(fRecord, [_, Value],[],[Value]).
 %               listOfFunctions(functionId(listOfServiceInstances), latencyFromPrevious)
 
 functionOrch(
-  stockOrch,(event2, [top,low,medium]), %trigger
+  stockOrch,(event2, [medium,low, top]), %trigger
   seq(
     fun(fCheck,[],250),
     seq(
@@ -55,4 +55,5 @@ serviceLabel(SId, maps, medium) :- service(SId, cloudProvider, maps, _).
 serviceLabel(SId, Type, low) :- 
     service(SId, Provider, Type, _),
     \+(Provider == appOp),
+    \+(Provider == pa),
     \+((Provider == cloudProvider, Type == maps)).

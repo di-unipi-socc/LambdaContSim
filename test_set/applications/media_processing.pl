@@ -3,7 +3,7 @@
 
 % functionReqs(functionId, listOfSWReqs, HWReqs(memory, vCPU, Htz), timeout, listOfServiceReqs(serviceType, latency))
 functionReqs(fDocAnalysis, [py3], (1024, 2, 500), [(bucket, 160)]).
-functionReqs(fProcDoc, [js], (1024, 1, 800), [userDB, 210]).
+functionReqs(fProcDoc, [js], (1024, 1, 800), [(userDB, 210)]).
 functionReqs(fPayAppr, [py3], (256, 2, 400), []).
 functionReqs(fNotify, [py3], (128, 2, 500), []).
 functionReqs(fArchive, [py3], (256, 2, 500), []).
