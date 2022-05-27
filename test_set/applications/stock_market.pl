@@ -10,7 +10,7 @@ functionReqs(fRecord, [py3], (1600, 2, 500), [(database, 200)]).
 
 %functionBehaviour(functionId, listOfInputs, listOfun(serviceReq, TypeParam), listOfOutputs)
 functionBehaviour(fCheck, [Stock, Value, Purchase],[Stock],[Stock, Value, Purchase]).
-functionBehaviour(fBuyOrSell, [Stock, Value, Purchase],[],[Stock, Value]).
+functionBehaviour(fBuyOrSell, [Stock, Value, _],[],[Stock, Value]).
 functionBehaviour(fSell, [Stock, Value],[],[Stock, Value]).
 functionBehaviour(fBuy, [Stock, Value],[],[Stock, Value]).
 functionBehaviour(fRecord, [_, Value],[],[Value]).     
