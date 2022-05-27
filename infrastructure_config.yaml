@@ -20,7 +20,7 @@ nodes:
         v_cpu: inf
         mhz: inf
   fog:
-    - probability: 0.1
+    - probability: 0.05
       provider: university
       security_caps:
         - pubKeyE
@@ -52,10 +52,11 @@ nodes:
         memory: 4096
         v_cpu: 4
         mhz: 2000
-    - probability: 0.15
+    - probability: 0.2
       provider: telco
       security_caps:
         - pubKeyE
+        - antiTamp
       software_caps:
         - py3
         - numPy
@@ -144,7 +145,7 @@ event_generators:
     min_quantity: 2
     max_quantity: 5
   events_per_generator:
-    min_quantity: 2
+    min_quantity: 3
     max_quantity: 4
   on_edge_probability: 0.75
   events:
@@ -161,23 +162,37 @@ services:
     - base_name: cMaps
       provider: cloudProvider
       type: maps
+      min_quantity : 1
+      max_quantity: 2
     - base_name: bucket
       provider: cloudProvider
       type: bucket
+      min_quantity : 1
+      max_quantity: 2
   fog:
     - base_name: myUserDb
       provider: appOp
       type: userDB
+      min_quantity : 1
+      max_quantity: 3
     - base_name: myDatabase
       provider: appOp
       type: database
+      min_quantity : 1
+      max_quantity: 3
     - base_name: gp
       provider: pa
       type: checkGp
+      min_quantity : 1
+      max_quantity: 3
     - base_name: rules
       provider: pa
       type: checkRules
+      min_quantity : 1
+      max_quantity: 3
   edge:
     - base_name: openM
       provider: openS
       type: maps
+      min_quantity : 1
+      max_quantity: 3

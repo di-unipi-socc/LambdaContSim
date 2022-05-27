@@ -10,6 +10,7 @@ from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from infrastructure.service import Service
 import os
 from utils import take_decision
+from matplotlib import pyplot
 
 
 def print_usage():
@@ -166,6 +167,7 @@ def generate_infrastructure():
     graph.add_weighted_edges_from(edges, available = True)
     
     # find shortest path lengths between nodes
+    
     network_latencies = dict(nx.all_pairs_dijkstra_path_length(graph))
     
     graph_nodes : list[str] = list(graph)
@@ -211,49 +213,26 @@ def generate_infrastructure():
     config_services = config['services']
     index = 0
 
-    # TODO limita numero di servizi
-    for node_id in graph_nodes:
-        if index > 10:
-            break
-        # TODO remove category part
-        category = "edge"
-        if node_id.startswith("cloud"):
-            category = "cloud"
-        elif node_id.startswith("fog"):
-            category = "fog"
-        
+    for category in ['cloud', 'fog', 'edge']:
         services_by_category = config_services[category]
 
         for service in services_by_category:
-            index += 1
-            service_id = service['base_name'] + str(index)
-            service = Service(service_id, service['provider'], service['type'], node_id)
-            services.append(service)
+            min_num_service = service['min_quantity']
+            max_num_service = service['max_quantity']
+            quantity = random.randint(min_num_service, max_num_service)
+            chosen_nodes = random.sample(
+                population = nodes_by_category[category],
+                k = quantity,
+            )
+            for node in chosen_nodes:
+                index += 1
+                node_id = node.id
+                service_id = service['base_name'] + str(index)
+                servicex = Service(service_id, service['provider'], service['type'], node_id)
+                services.append(servicex)
     
-    for node_id in graph_nodes:
-        if index > 15:
-            break
-        # TODO remove category part
-        category = "edge"
-        if node_id.startswith("cloud"):
-            category = "cloud"
-        elif node_id.startswith("fog"):
-            category = "fog"
-        
-        if category != 'edge':
-            continue
-        
-        services_by_category = config_services[category]
-
-        for service in services_by_category:
-            index += 1
-            service_id = service['base_name'] + str(index)
-            service = Service(service_id, service['provider'], service['type'], node_id)
-            services.append(service)
-
-
-    # plot the graph
     '''
+    # plot the graph
     color_map = []
     for node in graph:
         node_str = str(node)
