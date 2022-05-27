@@ -43,7 +43,9 @@ class Node :
     security_capabilites : list[str] = [] # list of security caps
     software_capabilites : list[str] = [] # list of software caps
     # hardware capabities
+    max_memory : int = 0
     memory: int = 0
+    max_v_cpu : int = 0
     v_cpu: int = 0
     mhz: int = 0
 
@@ -64,7 +66,9 @@ class Node :
         self.security_capabilites = sec_caps
         self.software_capabilites = sw_caps
         self.memory = memory
+        self.max_memory = memory
         self.v_cpu = v_cpu
+        self.max_v_cpu = v_cpu
         self.mhz = mhz
 
 
@@ -80,6 +84,32 @@ class Node :
             self.memory += memory
         if not isinf(self.v_cpu):
             self.v_cpu += v_cpu
+    
+
+    def get_load(self):
+        '''
+        Returns the percentage load of the node.
+        It is a value between 0 and 1
+        '''
+        memory_percentage = 1 if isinf(self.memory) else 1 - self.memory/self.max_memory
+        v_cpu_percentage = 1 if isinf(self.v_cpu) else 1 - self.v_cpu/self.max_v_cpu
+        
+        # cpus has the major role in load calculation
+        return v_cpu_percentage * 0.7 + memory_percentage * 0.3
+    
+
+    def get_energy(self):
+        '''
+        Returns the node's consuption at that time.
+        Value is expressed in KWh
+        '''
+        load = self.get_load()
+        # load is under 50%
+        if load < 0.5:
+            return 0.2
+        # load over 50%
+        return 0.4
+        
     
 
     # internal function to determine the node category
