@@ -5,12 +5,12 @@ simulator:
   function_duration : 1
   seed : -1 # if seed is -1 then ignore it
   use_padding : true
+  max_placement_time : 1
 
 events:
   generator_trigger_probability: 0.3
   event_min_probability: 0.3
   event_max_probability: 1
-
 
 infrastructure:
   type: physical # allowed values are 'logical' and 'physical'
@@ -26,6 +26,19 @@ infrastructure:
     edge : 0.9
   link_crash_probability : 0.05
   link_resurrection_probability : 0.3
+  energy:
+    cloud:
+      threshold: 0.5
+      low: 0.2
+      high: 0.4
+    fog:
+      threshold: 0.5
+      low: 0.2
+      high: 0.4
+    edge:
+      threshold: 0.5
+      low: 0.2
+      high: 0.4
 
 applications:
   "Siotec2022" :

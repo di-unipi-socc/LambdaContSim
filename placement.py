@@ -3,24 +3,54 @@ from enum import Enum
 
 # types of placements
 
-class PlacementType(Enum):
+class PlacementType(str, Enum):
     PADDED_PLACEMENT = "paddedPlacement"
     UNPADDED_PLACEMENT = "unPaddedPlacement"
-    REPLACEMENT = "replacement"
+    PADDED_REPLACEMENT = "paddedReplacement"
+    UNPADDED_REPLACEMENT = "unPaddedReplacement"
 
 
-def get_placement_query(placement_type : PlacementType, orchestration_id : str, generator_id : str = None, starting_function : str = None, starting_node : str = None) -> (str | None):
+def get_placement_query(placement_type : PlacementType, max_placement_time : int, orchestration_id : str, generator_id : str = None, starting_function : str = None, starting_nodes : list[str] = None) -> (str | None):
     '''Get the query to execute based on the placement type'''
 
-    if placement_type == PlacementType.PADDED_PLACEMENT:
-        # once means that we take the first of the results
-        return f'once(secfaas2fog({generator_id}, {orchestration_id}, Placement)).'
-    elif placement_type == PlacementType.UNPADDED_PLACEMENT:
-        return f'once(noPad({generator_id}, {orchestration_id}, Placement)).'
-    elif placement_type == PlacementType.REPLACEMENT:
-        return f'once(replacement({starting_function}, {starting_node}, {orchestration_id}, Placement)).'
+    match placement_type :
+        case PlacementType.PADDED_PLACEMENT | PlacementType.UNPADDED_PLACEMENT:
+            query_command = ''
+            if placement_type == PlacementType.PADDED_PLACEMENT:
+                query_command = 'secfaas2fogOpt'
+            else:
+                query_command = 'secfaas2fogOptNoPad'
 
-    return None
+            # generator id cannot be None
+            if generator_id is None:
+                return None
+            
+            # once means that we take the first of the results
+            return f'once({query_command}({max_placement_time}, {generator_id}, {orchestration_id}, Placement)).'
+        
+        case PlacementType.PADDED_REPLACEMENT | PlacementType.UNPADDED_REPLACEMENT:
+            query_command = ''
+            if placement_type == PlacementType.PADDED_REPLACEMENT:
+                query_command = 'replacement'
+            else:
+                query_command = 'replacementNoPad'
+            
+            # starting function cannot be None
+            if starting_function is None:
+                return None
+            # list of starting nodes cannot be None or empty
+            if starting_nodes is None or len(starting_nodes) == 0:
+                return None
+            
+            to_return = f'once({query_command}({max_placement_time}, {starting_function}, ['
+            for node in starting_nodes:
+                to_return += f'{node},'
+            to_return = to_return.removesuffix(',')
+            to_return += f'], {orchestration_id}, Placement)).'
+
+            return to_return
+
+        case _: return None
 
 
 # function used to parse prolog placement
@@ -145,6 +175,15 @@ def build_app_chain(prolog_placement: dict) -> dict[str, str]:
 
     dependencies = {}
 
+    # when we place/replace only one function of an application
+    # the raw placement has a ambiguous form
+    # so we build dependencies ourselves
+    if prolog_placement['Placement']['functor'] == 'fp':
+        function_name = prolog_placement['Placement']['args'][0]
+        dependencies[function_name] = []
+
+        return dependencies
+
     _ = rec_build_app_chain(prolog_placement['Placement'], dependencies, None)
 
     to_return = {}
@@ -157,7 +196,11 @@ def build_app_chain(prolog_placement: dict) -> dict[str, str]:
                 new_value = unpack_nested_tuples(value)
                 to_return[key] = new_value
             else:
-                new_value = [value]
+                # starting functions depends from None, delete it
+                if value is None:
+                    new_value = []
+                else:
+                    new_value = [value]
                 to_return[key] = new_value
 
     return to_return

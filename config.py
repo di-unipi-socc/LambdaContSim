@@ -13,6 +13,7 @@ def parse_config(path):
     global sim_function_duration
     global sim_seed
     global sim_use_padding
+    global sim_max_placement_time
 
     # EVENTS
     global event_generator_trigger_probability
@@ -27,6 +28,7 @@ def parse_config(path):
     global infr_node_resurrection_probability
     global infr_link_crash_probability
     global infr_link_resurrection_probability
+    global infr_energy
     
     # APPLICATIONS
     global applications
@@ -49,6 +51,7 @@ def parse_config(path):
 
         sim_seed = config['simulator']['seed']
         sim_use_padding = config['simulator']['use_padding']
+        sim_max_placement_time = config['simulator']['max_placement_time'] # TODO must be equals or greater than 1
 
         # EVENTS
 
@@ -99,6 +102,8 @@ def parse_config(path):
             }
             infr_link_crash_probability = 0
             infr_link_resurrection_probability = 0
+        
+        infr_energy = config['infrastructure']['energy']
 
         # APPLICATIONS
         

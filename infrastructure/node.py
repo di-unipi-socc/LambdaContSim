@@ -1,5 +1,6 @@
 from math import isinf
 from enum import Enum
+import config
 
 # class which represents an infrastracture node
 
@@ -23,31 +24,30 @@ class NodeCategory(Enum):
                 return None
     
     @staticmethod
-    def to_string(category_str : str):
+    def to_string(category):
         
-        match category_str:
-            case 'cloud':
-                return NodeCategory.CLOUD
-            case 'fog':
-                return NodeCategory.FOG
-            case 'edge':
-                return NodeCategory.EDGE
-            case _:
-                return None
+        if category == NodeCategory.CLOUD:
+            return 'cloud'
+        elif category == NodeCategory.FOG:
+            return 'fog'
+        elif category == NodeCategory.EDGE:
+            return 'edge'
+        
+        return None
 
 
 class Node :
-    id : str = '' # node unique identifier e.g. IP address
+    id : str # node unique identifier e.g. IP address
     category : NodeCategory # node category (edge, fog, cloud)
-    provider : str = '' # node's owner
-    security_capabilites : list[str] = [] # list of security caps
-    software_capabilites : list[str] = [] # list of software caps
+    provider : str # node's owner
+    security_capabilites : list[str] # list of security caps
+    software_capabilites : list[str] # list of software caps
     # hardware capabities
-    max_memory : int = 0
-    memory: int = 0
-    max_v_cpu : int = 0
-    v_cpu: int = 0
-    mhz: int = 0
+    max_memory : int
+    memory: int
+    max_v_cpu : int
+    v_cpu: int
+    mhz: int
 
     def __init__(
         self, node_id : str,
@@ -104,11 +104,13 @@ class Node :
         Value is expressed in KWh
         '''
         load = self.get_load()
-        # load is under 50%
-        if load < 0.5:
-            return 0.2
-        # load over 50%
-        return 0.4
+        consumption = config.infr_energy[NodeCategory.to_string(self.category)]
+        
+        # load is under a certain threshold
+        if load < consumption['threshold']:
+            return consumption['low']
+
+        return consumption['high']
         
     
 

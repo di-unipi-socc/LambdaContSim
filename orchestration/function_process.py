@@ -28,11 +28,13 @@ class FunctionProcess:
         self.fun.state = FunctionState.RUNNING
 
         try:
-            
+
             # simulate the function execution
             yield self.env.timeout(config.sim_function_duration)
 
         except simpy.Interrupt:
+            # function interrupted - probably there is a crash
+
             logger.info("Application %s - Function %s has been interrupted", self.application.id, self.fun.id)
 
             # function has been canceled
@@ -51,11 +53,9 @@ class FunctionProcess:
         # function exited
         self.fun.state = FunctionState.COMPLETED
 
-        #print("Function %s finished" % self.fun.id)
-
         # get functions which depends on me
         dependent_functions : list = get_next_functions_by_id(self.application.chain, self.fun.id)
-        
+
         # delete myself from the chain
         delete_executed_function(self.application.chain, self.fun.id)
 
@@ -81,8 +81,8 @@ class FunctionProcess:
             # probability that the guard is True, default is 0.5
             guard_probability = 0.5
 
-            application_id = self.application.id
-            guards : dict = config.applications[application_id]['guards']
+            application_name = self.application.name
+            guards : dict = config.applications[application_name]['guards']
             
             if self.fun.id in guards.keys():
                 guard_probability = guards[self.fun.id]
@@ -116,15 +116,16 @@ class FunctionProcess:
 
             # execute the taken function
             fun_process = FunctionProcess(self.application.placement[taken_branch], self.env, self.application)
-            self.application.function_processes.append(fun_process)
+            self.application.function_processes[taken_branch] = fun_process
         
         else:
             # execute the functions
-            for fun in to_execute:
-                fun_process = FunctionProcess(self.application.placement[fun], self.env, self.application)
-                self.application.function_processes.append(fun_process)
+            for function_name in to_execute:
+                fun_process = FunctionProcess(self.application.placement[function_name], self.env, self.application)
+                self.application.function_processes[function_name] = fun_process
         
-        # free node memory
+        # release resources
+
         fun_name = self.fun.id
         node_id = self.application.placement[fun_name].node_id
         node : Node = self.application.infrastructure_nodes[node_id]

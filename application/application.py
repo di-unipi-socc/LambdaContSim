@@ -1,29 +1,42 @@
-from enum import Enum
+from enum import IntEnum
+import itertools
+import copy
 
-from infrastructure.infrastructure import Infrastructure
-#from orchestration.function_process import FunctionProcess
+from application.placed_function import PlacedFunction
 
 
-class ApplicationState(Enum):
+class ApplicationState(IntEnum):
     PLACED = 0
     RUNNING = 1
     COMPLETED = 2
     CANCELED = 3
 
 class Application:
-    id = "" # Application name
-    filename = ""
-    state : ApplicationState = ApplicationState.PLACED
-    chain : dict
-    placement : dict
+
+    # unique id iterator variable
+    id_iterator = itertools.count()
+
+    id : str
+    name : str
+    filename : str
+    orchestration_id : str
+    state : ApplicationState
+    original_chain : dict[str, list]
+    chain : dict[str, list]
+    placement : dict[str, PlacedFunction]
     infrastructure_nodes : dict
-    function_processes : list = []
+    function_processes : dict
 
 
-    def __init__(self, app_id: str, filename: str, chain: dict, placement : dict, infrastructure : dict):
-        self.id = app_id
+    def __init__(self, app_name: str, filename: str, orchestration_id : str, chain: dict, placement : dict, infrastructure : dict):
+        self.id = app_name + "-" + str(next(Application.id_iterator))
+        self.name = app_name
         self.filename = filename
-        self.chain = chain
+        self.orchestration_id = orchestration_id
+        self.state = ApplicationState.PLACED
+        self.original_chain = copy.deepcopy(chain)
+        self.chain = copy.deepcopy(chain)
         self.placement = placement
         self.infrastructure_nodes = infrastructure
+        self.function_processes = {}
 

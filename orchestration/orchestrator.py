@@ -21,7 +21,7 @@ class Orchestrator(threading.Thread):
         self.application.state = ApplicationState.RUNNING
 
         # execute ready functions
-        for fun in ready_functions:
-            fun_process = FunctionProcess(self.application.placement[fun], self.env, self.application)
-            self.application.function_processes.append(fun_process)
+        for function_name in ready_functions:
+            fun_process = FunctionProcess(self.application.placement[function_name], self.env, self.application)
+            self.application.function_processes[function_name] = fun_process
 

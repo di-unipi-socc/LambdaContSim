@@ -3,7 +3,7 @@ from datetime import datetime
 from swiplserver import PrologError, PrologMQI
 import json
 from application.application import Application, ApplicationState
-from application.placed_function import FunctionState
+from application.placed_function import FunctionState, PlacedFunction
 from config import parse_config
 from generate_infrastructure import generate_infrastructure
 from infrastructure.infrastructure import Infrastructure
@@ -19,7 +19,7 @@ import logging
 from placement import PlacementType, build_app_chain, get_placement_query, parse_placement
 import simpy
 import global_variables as g
-from utils import take_decision
+from utils import get_recursive_dependents, take_decision, get_oldest
 import random
 
 
@@ -97,7 +97,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
             f.write(line+'\n')
 
 
-def get_raw_placement(placement_type : PlacementType, orchestration_id : str, generator_id : str = None, starting_function : str = None, starting_node : str = None):
+def get_raw_placement(placement_type : PlacementType, orchestration_id : str, generator_id : str = None, starting_function : str = None, starting_nodes : list[str] = None):
     '''
     Returns the application placement found by SecFaas2Fog.
     Returns a 3-tuple (placement, execution start, execution end):
@@ -112,21 +112,21 @@ def get_raw_placement(placement_type : PlacementType, orchestration_id : str, ge
     query = ""
 
     # if we need a replacement, we have to pass starting function and starting node
-    if placement_type == PlacementType.REPLACEMENT:
+    if placement_type in [PlacementType.PADDED_REPLACEMENT, PlacementType.UNPADDED_REPLACEMENT]:
         query = get_placement_query(
             placement_type=placement_type,
+            max_placement_time=config.sim_max_placement_time,
             orchestration_id=orchestration_id,
             starting_function=starting_function,
-            starting_node=starting_node
+            starting_nodes=starting_nodes
         )
-    elif placement_type == PlacementType.PADDED_PLACEMENT or placement_type == PlacementType.UNPADDED_PLACEMENT:
+    elif placement_type in [PlacementType.PADDED_PLACEMENT, PlacementType.UNPADDED_PLACEMENT]:
         query = get_placement_query(
             placement_type=placement_type,
+            max_placement_time=config.sim_max_placement_time,
             orchestration_id=orchestration_id,
             generator_id=generator_id
         )
-    
-    #print(query)
     
     if query is None:
         return None, None, None
@@ -167,7 +167,7 @@ def get_raw_placement(placement_type : PlacementType, orchestration_id : str, ge
 
 def place_application(
     application_name : str,
-    application_filename : str,
+    config_application : dict,
     generator_id : str,
     infrastructure : Infrastructure,
     applications_stats : dict,
@@ -200,6 +200,20 @@ def place_application(
         application_chain = build_app_chain(raw_placement)
         placement = parse_placement(raw_placement)
         
+        # calculate for each function its dependency nodes
+        functions = placement.keys()
+        for function_name in functions:
+            placed_function = placement[function_name]
+            dependencies = application_chain[function_name]
+            if len(dependencies) == 0:
+                # starting function
+                placed_function.previous_nodes.append(generator_id)
+            else:
+                for dependency in dependencies:
+                    node_id = placement[dependency].node_id
+                    if node_id not in placed_function.previous_nodes:
+                        placed_function.previous_nodes.append(node_id)
+        
         #print(placement)
         #print(application_chain)
 
@@ -224,16 +238,23 @@ def place_application(
     if application_can_be_placed :
 
         # create application instance
-        application_obj = Application(application_name, application_filename, application_chain, placement, infrastructure.nodes)
+        application_obj = Application(
+            application_name,
+            config_application['filename'],
+            config_application['orchestration_id'],
+            application_chain,
+            placement,
+            infrastructure.nodes
+        )
         
         # place application over the infrastructure (update nodes capabilities: memory, number of vCPUs )
         functions = placement.keys()
-        for function in functions:
-            node_id = placement[function].node_id
+        for function_id in functions:
+            node_id = placement[function_id].node_id
             node_obj = infrastructure.nodes[node_id]
             
             # take resources from the node
-            node_obj.take_resources(memory = placement[function].memory, v_cpu = placement[function].v_cpu)
+            node_obj.take_resources(memory = placement[function_id].memory, v_cpu = placement[function_id].v_cpu)
         
         return application_obj
     
@@ -241,11 +262,99 @@ def place_application(
 
 
 def replace_application(
-    orchestration_id : str,
+    application_obj : Application,
     starting_function : str,
-    starting_node : str
+    starting_nodes : list[str],
+    event : str,
+    infrastructure : Infrastructure,
+    applications_stats : dict,
 ):
-    pass
+    # get the logger
+    logger = logs.get_logger()
+
+    # application should be padded?
+    placement_type = PlacementType.PADDED_REPLACEMENT
+    if not config.sim_use_padding:
+        placement_type = PlacementType.UNPADDED_REPLACEMENT
+
+    # get application name
+    application_name = application_obj.name
+
+    # try to place this app with SecFaas2Fog
+
+    # it will reply with a valid placement iff application can be placed
+    raw_placement, start_time, end_time = get_raw_placement(
+        placement_type=placement_type,
+        starting_function=starting_function,
+        starting_nodes=starting_nodes,
+        orchestration_id=config.applications[application_name]['orchestration_id']
+    )
+
+    application_can_be_placed = False
+
+    if raw_placement is None:
+        logger.critical("Query is None")  
+    elif raw_placement == {}:
+        logger.info("Replacement failed for %s", application_obj.id)
+    else:
+        new_application_chain = build_app_chain(raw_placement)
+        new_placement = parse_placement(raw_placement)
+        
+        #print(new_placement)
+        #print(new_application_chain)
+
+        # calculate for each function its dependency nodes
+        functions = new_placement.keys()
+        for function_name in functions:
+            new_placed_function = new_placement[function_name]
+            new_function_dependencies = new_application_chain[function_name]
+            if len(new_function_dependencies) == 0:
+                # start function
+                new_placed_function.previous_nodes += starting_nodes
+            else:
+                for dependency in new_function_dependencies:
+                    
+                    node_id = new_placement[dependency].node_id
+                    
+                    if node_id not in new_placed_function.previous_nodes:
+                        new_placed_function.previous_nodes.append(node_id)
+
+        application_can_be_placed = True
+
+        logger.info("Replacement found for %s", application_obj.id)
+
+    if application_name not in applications_stats.keys():
+        applications_stats[application_name] = {}
+        applications_stats[application_name]['placements'] = []
+
+    # normal placement
+    placement_data : dict = {
+        'event' : event, # TODO
+        'start' : start_time,
+        'end' : end_time,
+        'success' : application_can_be_placed
+    }
+
+    applications_stats[application_name]['placements'].append(placement_data)
+
+    if application_can_be_placed :
+
+        # update the application replacing old placed functions with new ones
+        functions = new_placement.keys()
+        for function_id in functions:
+            application_obj.placement[function_id] = new_placement[function_id]
+
+        # place new functions over the infrastructure (update nodes capabilities: memory, number of vCPUs )
+        for function_id in functions:
+            node_id = new_placement[function_id].node_id
+            node_obj = infrastructure.nodes[node_id]
+            
+            # take resources from the node
+            node_obj.take_resources(memory = new_placement[function_id].memory, v_cpu = new_placement[function_id].v_cpu)
+        
+        return True, new_application_chain
+    
+    return False, None
 
 
 def simulation(
@@ -292,30 +401,30 @@ def simulation(
                     # for each application, check if it is triggered by one of these events
                     for application_name in config.applications:
 
-                        application = config.applications[application_name]
+                        config_application = config.applications[application_name]
 
-                        if application['trigger_event'] in triggered_events:
+                        if config_application['trigger_event'] in triggered_events:
 
                             # try to place the application
-                            logger.info(f"Event {application['trigger_event']} ({event_generator.generator_id}) triggered {application_name}")
+                            logger.info(f"Event {config_application['trigger_event']} ({event_generator.generator_id}) triggered {application_name}")
                             
                             # get application path
-                            application_filename = application['filename']
+                            application_filename = config_application['filename']
                             application_path = os.path.join(g.applications_path, application_filename)
 
                             # save application file into default path
                             shutil.copy(application_path, g.secfaas2fog_application_path)
 
                             # place
-                            application = place_application(application_name, application_filename, event_generator.generator_id, infrastructure, applications_stats)
+                            application_obj = place_application(application_name, config_application, event_generator.generator_id, infrastructure, applications_stats)
 
-                            if application is not None:
+                            if application_obj is not None:
                                 # launch application
-                                thread = Orchestrator(env, application)
+                                thread = Orchestrator(env=env, application=application_obj)
                                 thread.start()
 
                                 # add application into a list
-                                list_of_applications.append(application)
+                                list_of_applications.append(application_obj)
 
                             # update infastructure.pl
                             dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
@@ -376,81 +485,83 @@ def simulation(
         crashed_nodes = list(crashed_node_id.values())
 
         # there are affected applications?
-        for application in list_of_applications:
+        for application_obj in list_of_applications:
 
-            # completed apps are not interesting
-            if application.state == ApplicationState.COMPLETED:
+            # completed or canceled apps are not interesting
+            if application_obj.state in [ApplicationState.COMPLETED, ApplicationState.CANCELED]:
                 continue
 
-            needs_new_placement = False
+            # list of functions interested by the crash
+            interested_functions = []
             
-            # check if in the crashed node were deployed a function of this app
+            # check if there is at least one function deployed in the crashed nodes
             # check only waiting and running functions
-            for function_name in application.placement:
-                function = application.placement[function_name]
-                if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
-                    if function.node_id in crashed_nodes:
-                        
-                        # app need a new placement
-                        needs_new_placement = True
-                        break
-        
-            if needs_new_placement:
-                logger.info("Application %s needs a new placement", application.id)
+            for function_name in application_obj.placement:
+                placed_function : PlacedFunction = application_obj.placement[function_name]
                 
-                # update application status
-                application.state = ApplicationState.CANCELED
+                if placed_function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
+                    if placed_function.node_id in crashed_nodes:
+                        interested_functions.append(placed_function.id)
 
-                # trigger application functions
-                for function_process in application.function_processes:
-                    if function_process.fun.state == FunctionState.RUNNING:
-                        function_process.action.interrupt()
+                        # interrupt the function if it is running
+                        if placed_function.state == FunctionState.RUNNING:
+                            
+                            application_obj.function_processes[placed_function.id].action.interrupt()
+        
+            if len(interested_functions) > 0:
+                logger.info("Application %s needs a replacement", application_obj.id)
 
-                # release all resources of waiting functions
-                for function_name in application.placement:
-                    function = application.placement[function_name]
-                    if function.state == FunctionState.WAITING:
-                        node_id = function.node_id
-                        node_obj = application.infrastructure_nodes[node_id]
-                        node_obj.release_resources(function.memory, function.v_cpu)
+                # find the oldest relative among them
+                start_function = get_oldest(interested_functions, application_obj.original_chain)
 
-                        logger.info("Application %s - Function %s has been canceled", application.id, function.id)
-                        function_process.fun.state = FunctionState.CANCELED
+                dependents_functions = get_recursive_dependents(start_function, application_obj.chain)
+                
+                starting_nodes = application_obj.placement[start_function].previous_nodes
+
+                # release all resources of dependents functions
+                for function_name in dependents_functions:
+                    function = application_obj.placement[function_name]
+                    node_id = function.node_id
+                    node_obj = application_obj.infrastructure_nodes[node_id]
+                    node_obj.release_resources(function.memory, function.v_cpu)
+
+                    logger.info("Application %s - Function %s has been canceled", application_obj.id, function.id)
+                    function.state = FunctionState.CANCELED
 
                 # search for a new placement
 
                 # save application file into default path
-                application_path = os.path.join(g.applications_path, application.filename)
+                application_path = os.path.join(g.applications_path, application_obj.filename)
                 shutil.copy(application_path, g.secfaas2fog_application_path)
 
-                # TODO sistema print
-                event = f"node(s) {[node for node in list(crashed_node_id.values())]} crashed"
+                event = f"node(s) {[node for node in list(crashed_node_id.values()) if node]} crashed"
 
-                application = place_application(
-                    application.id, 
-                    application.filename, 
+                is_successfully_replaced, replaced_application_chain = replace_application(
+                    application_obj,
+                    start_function,
+                    starting_nodes,
                     event, 
                     infrastructure, 
                     applications_stats
                 )
 
-                if application is not None:
-                    # launch application
-                    thread = Orchestrator(env, application)
-                    thread.start()
+                if is_successfully_replaced:
+                    # update the application chain with the new placement
+                    functions = replaced_application_chain.keys()
+                    for function in functions:
+                        for dependent_function in replaced_application_chain[function]:
+                            if dependent_function not in application_obj.chain[function]:
+                                application_obj.chain[function].append(dependent_function)
 
-                    # add application into a list
-                    # this application must not be affected by the crash because
-                    # it has been just placed
-                    # so we add it in a temportary app list
-                    apps_just_added.append(application)                                           
+                else:
+                    application_obj.state = ApplicationState.CANCELED
 
         # LINK crash
         link_crashed = take_decision(config.infr_link_crash_probability)
 
         link_resurrected = take_decision(config.infr_link_resurrection_probability)
 
-        if link_crashed:
+        if False and link_crashed: # TODO
             first_node, second_node = infrastructure.simulate_link_crash()
             
             if first_node != None and second_node != None:
@@ -468,18 +579,18 @@ def simulation(
                 # a link crash affect the app iff the 2 nodes were 'consecutive'
                 # functions must be waiting or running
                 # there are affected applications?
-                for application in list_of_applications:
+                for application_obj in list_of_applications:
 
                     # completed apps are not interesting
-                    if application.state == ApplicationState.COMPLETED:
+                    if application_obj.state == ApplicationState.COMPLETED:
                         continue
 
                     needs_new_placement = False
                     
                     # check if in the crashed node were deployed a function of this app
                     # check only waiting and running functions
-                    for function_name in application.placement:
-                        function = application.placement[function_name]
+                    for function_name in application_obj.placement:
+                        function = application_obj.placement[function_name]
                         if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
                             # TODO make it better
                             if function.node_id in [first_node, second_node]:
@@ -487,31 +598,31 @@ def simulation(
                                 break
                 
                     if needs_new_placement:
-                        logger.info("Application %s needs a new placement", application.id)
+                        logger.info("Application %s needs a new placement", application_obj.id)
                         
                         # update application status
-                        application.state = ApplicationState.CANCELED
+                        application_obj.state = ApplicationState.CANCELED
 
                         # trigger application functions
-                        for function_process in application.function_processes:
+                        for function_process in application_obj.function_processes:
                             if function_process.fun.state == FunctionState.RUNNING:
                                 function_process.action.interrupt()
 
                         # release all resources of waiting functions
-                        for function_name in application.placement:
-                            function = application.placement[function_name]
+                        for function_name in application_obj.placement:
+                            function = application_obj.placement[function_name]
                             if function.state == FunctionState.WAITING:
                                 node_id = function.node_id
-                                node_obj = application.infrastructure_nodes[node_id]
+                                node_obj = application_obj.infrastructure_nodes[node_id]
                                 node_obj.release_resources(function.memory, function.v_cpu)
 
-                                logger.info("Application %s - Function %s has been canceled", application.id, function.id)
+                                logger.info("Application %s - Function %s has been canceled", application_obj.id, function.id)
                                 function_process.fun.state = FunctionState.CANCELED
 
                         # search for a new placement
 
                         # save application file into default path
-                        application_path = os.path.join(g.applications_path, application.filename)
+                        application_path = os.path.join(g.applications_path, application_obj.filename)
                         shutil.copy(application_path, g.secfaas2fog_application_path)
 
                         event = "link %s <-> %s crashed" % (first_node, second_node)
