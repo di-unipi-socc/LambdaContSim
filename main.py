@@ -19,8 +19,9 @@ import logging
 from placement import PlacementType, build_app_chain, get_placement_query, parse_placement
 import simpy
 import global_variables as g
-from utils import get_recursive_dependents, take_decision, get_oldest
+from utils import get_recursive_dependents, is_edge_part, take_decision, get_oldest
 import random
+import networkx as nx
 
 # Statistical variables
 
@@ -81,6 +82,8 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     
     # get crashed nodes
     crashed_nodes = infrastructure.crashed_nodes
+    # get crashed links
+    crashed_links = infrastructure.crashed_links
     
     # write latencies informations
     latencies = infrastructure.latencies
@@ -93,8 +96,8 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
             # don't write a link with a crashed node
             if node2 in crashed_nodes:
                 continue
-            # don't write a crashed link TODO
-            if True:
+            # don't write a crashed link
+            if not (node1, node2) in crashed_links and not (node2, node1) in crashed_links:
                 string = f'latency({node1}, {node2}, {latencies[node1][node2]}).'
                 lines.append(string)
 
@@ -213,7 +216,9 @@ def place_application(
             dependencies = application_chain[function_name]
             if len(dependencies) == 0:
                 # starting function
-                placed_function.previous_nodes.append(generator_id)
+                # get the node where the generator is placed
+                generator_node = [gen for gen in infrastructure.event_generators if gen.generator_id == generator_id][0].source_node
+                placed_function.previous_nodes.append(generator_node)
             else:
                 for dependency in dependencies:
                     node_id = placement[dependency].node_id
@@ -234,7 +239,8 @@ def place_application(
     # normal placement
     placement_data : dict = {
         'event' : 'placement',
-        'devices' : [generator_id],
+        'nodes' : [generator_id],
+        'links' : [],
         'start' : start_time,
         'end' : end_time,
         'success' : application_can_be_placed
@@ -273,6 +279,7 @@ def replace_application(
     starting_function : str,
     starting_nodes : list[str],
     crashed_nodes : list,
+    crashed_link : list,
     infrastructure : Infrastructure
 ):
     # get the logger
@@ -336,7 +343,8 @@ def replace_application(
     # normal placement
     placement_data : dict = {
         'event' : 'crash',
-        'devices' : crashed_nodes,
+        'nodes' : crashed_nodes,
+        'links' : crashed_link,
         'start' : start_time,
         'end' : end_time,
         'success' : application_can_be_placed
@@ -441,6 +449,8 @@ def simulation(
         resurrected_node_id = {}
         first_node = None
         second_node = None
+        first_crashed_node = None
+        second_crashed_node = None
         
         # list of replacing applications
         apps_just_added : list[Application] = []
@@ -488,6 +498,51 @@ def simulation(
 
         crashed_nodes = list(crashed_node_id.values())
 
+        # LINK crash
+        link_crashed = take_decision(config.infr_link_crash_probability)
+
+        link_resurrected = take_decision(config.infr_link_resurrection_probability)
+
+        crashed_link = []
+
+        if link_crashed:
+            first_crashed_node, second_crashed_node = infrastructure.simulate_link_crash()
+            
+            if first_crashed_node != None and second_crashed_node != None:
+                logger.info("Link %s <-> %s crashed", first_crashed_node, second_crashed_node)
+
+                # add event to the list
+                event = {
+                    'type' : 'crash',
+                    'first_node_id' : first_crashed_node,
+                    'second_node_id' : second_crashed_node,
+                    'epoch' : step_number
+                }
+                link_events.append(event)
+
+                crashed_link = [first_crashed_node, second_crashed_node]
+        
+        if link_resurrected:
+
+            if first_node is not None and second_node is not None:
+                link_to_exclude = (first_crashed_node, second_crashed_node)
+                # link which just crashed can't resurrect in the same epoch
+                first_node, second_node = infrastructure.simulate_link_resurrection(link_to_exclude)
+            else:
+                first_node, second_node = infrastructure.simulate_link_resurrection()
+
+            if first_node != None and second_node != None:
+                logger.info("Link %s <-> %s resurrected", first_node, second_node)
+
+                # add event to the list
+                event = {
+                    'type' : 'resurrection',
+                    'first_node_id' : first_node,
+                    'second_node_id' : second_node,
+                    'epoch' : step_number
+                }
+                link_events.append(event)
+
         # there are affected applications?
         for application_obj in list_of_applications:
 
@@ -496,27 +551,47 @@ def simulation(
                 continue
 
             # list of functions interested by the crash
-            interested_functions = []
+            interested_functions = set()
             
-            # check if there is at least one function deployed in the crashed nodes
-            # check only waiting and running functions
             for function_name in application_obj.placement:
                 placed_function : PlacedFunction = application_obj.placement[function_name]
-                
-                if placed_function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
-                    if placed_function.node_id in crashed_nodes:
-                        interested_functions.append(placed_function.id)
 
-                        # interrupt the function if it is running
-                        if placed_function.state == FunctionState.RUNNING:
-                            
-                            application_obj.function_processes[placed_function.id].action.interrupt()
+                # NODE crash
+                # check if there is at least one function deployed in the crashed nodes
+                # check only waiting and running functions
+
+                if node_crashed:
+                
+                    if placed_function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
+                        if placed_function.node_id in crashed_nodes:
+                            interested_functions.add(placed_function.id)
+
+                            # interrupt the function if it is running
+                            if placed_function.state == FunctionState.RUNNING:
+                                
+                                application_obj.function_processes[placed_function.id].action.interrupt()
+                
+                # LINK crash
+                # if there is a waiting function2 deployed on nodeY
+                # for any function1 deployed on nodeX
+                # where function2 is dependent on function1
+                # check if the link (node1, node2) belongs to the path from nodeX to nodeY
+
+                if link_crashed:
+                
+                    if placed_function.state == FunctionState.WAITING:
+                        node_y = placed_function.node_id
+                        previous_nodes = placed_function.previous_nodes
+                        for node_x in previous_nodes:
+                            path = nx.dijkstra_path(infrastructure.graph, node_x, node_y)
+                            if is_edge_part(path, first_crashed_node, second_crashed_node):
+                                interested_functions.add(placed_function.id)
         
             if len(interested_functions) > 0:
                 logger.info("Application %s needs a replacement", application_obj.id)
 
                 # find the oldest relative among them
-                start_function = get_oldest(interested_functions, application_obj.original_chain)
+                start_function = get_oldest(list(interested_functions), application_obj.original_chain)
 
                 dependents_functions = get_recursive_dependents(start_function, application_obj.chain)
                 
@@ -545,6 +620,7 @@ def simulation(
                     start_function,
                     starting_nodes,
                     crashed_nodes,
+                    crashed_link,
                     infrastructure
                 )
 
@@ -559,116 +635,6 @@ def simulation(
                 else:
                     application_obj.state = ApplicationState.CANCELED
 
-        # LINK crash
-        link_crashed = take_decision(config.infr_link_crash_probability)
-
-        link_resurrected = take_decision(config.infr_link_resurrection_probability)
-
-        if False and link_crashed: # TODO
-            first_node, second_node = infrastructure.simulate_link_crash()
-            
-            if first_node != None and second_node != None:
-                logger.info("Link %s <-> %s crashed", first_node, second_node)
-
-                # add event to the list
-                event = {
-                    'type' : 'crash',
-                    'first_node_id' : first_node,
-                    'second_node_id' : second_node,
-                    'epoch' : step_number
-                }
-                link_events.append(event)
-
-                # a link crash affect the app iff the 2 nodes were 'consecutive'
-                # functions must be waiting or running
-                # there are affected applications?
-                for application_obj in list_of_applications:
-
-                    # completed apps are not interesting
-                    if application_obj.state == ApplicationState.COMPLETED:
-                        continue
-
-                    needs_new_placement = False
-                    
-                    # check if in the crashed node were deployed a function of this app
-                    # check only waiting and running functions
-                    for function_name in application_obj.placement:
-                        function = application_obj.placement[function_name]
-                        if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
-                            # TODO make it better
-                            if function.node_id in [first_node, second_node]:
-                                needs_new_placement = True
-                                break
-                
-                    if needs_new_placement:
-                        logger.info("Application %s needs a new placement", application_obj.id)
-                        
-                        # update application status
-                        application_obj.state = ApplicationState.CANCELED
-
-                        # trigger application functions
-                        for function_process in application_obj.function_processes:
-                            if function_process.fun.state == FunctionState.RUNNING:
-                                function_process.action.interrupt()
-
-                        # release all resources of waiting functions
-                        for function_name in application_obj.placement:
-                            function = application_obj.placement[function_name]
-                            if function.state == FunctionState.WAITING:
-                                node_id = function.node_id
-                                node_obj = application_obj.infrastructure_nodes[node_id]
-                                node_obj.release_resources(function.memory, function.v_cpu)
-
-                                logger.info("Application %s - Function %s has been canceled", application_obj.id, function.id)
-                                function_process.fun.state = FunctionState.CANCELED
-
-                        # search for a new placement
-
-                        # save application file into default path
-                        application_path = os.path.join(g.applications_path, application_obj.filename)
-                        shutil.copy(application_path, g.secfaas2fog_application_path)
-
-                        event = "link %s <-> %s crashed" % (first_node, second_node)
-
-                        application = place_application(
-                            application.id, 
-                            application.filename, 
-                            event, 
-                            infrastructure, 
-                            applications_stats
-                        )
-
-                        if application is not None:
-                            thread = Orchestrator(env, application)
-                            thread.start()
-
-                            # add application into a list
-                            # this application must not be affected by the crash because
-                            # it has been just placed
-                            # so we add it in a temportary app list
-                            apps_just_added.append(application)                                           
-     
-        if link_resurrected:
-
-            if first_node is not None and second_node is not None:
-                link_to_exclude = {'first' : first_node, 'second' : second_node}
-                # link which just crashed can't resurrect in the same epoch
-                first_node, second_node = infrastructure.simulate_link_resurrection(link_to_exclude)
-            else:
-                first_node, second_node = infrastructure.simulate_link_resurrection()
-
-            if first_node != None and second_node != None:
-                logger.info("Link %s <-> %s resurrected", first_node, second_node)
-
-                # add event to the list
-                event = {
-                    'type' : 'resurrection',
-                    'first_node_id' : first_node,
-                    'second_node_id' : second_node,
-                    'epoch' : step_number
-                }
-                link_events.append(event)
-        
         # get nodes statistics
         for node in infrastructure.nodes.values():
             node_data = {

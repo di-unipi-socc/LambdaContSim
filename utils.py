@@ -163,6 +163,26 @@ def get_oldest(interested_functions : list, original_chain : dict[str, list]):
     return None
 
 
+def is_edge_part(path : list, node_x : str, node_y : str):
+    '''
+    Returns true if the edge is part of the path
+    '''
+    try:
+        index = path.index(node_x)
+        index_before = index - 1
+        index_after = index + 1
+        
+        check = False
+        if index_before >= 0:
+            check = check or path[index_before] == node_y
+        if index_after < len(path):
+            check = check or path[index_after] == node_y
+        
+        return check
+    except ValueError:
+        return False
+
+
 def take_decision(probability : float) -> bool:
 
     import random

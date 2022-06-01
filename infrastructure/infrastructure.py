@@ -89,12 +89,12 @@ class Infrastructure(ABC):
         nx.set_edge_attributes(self.graph, { (node1, node2) : { 'available' : False }})
         
         # save into the list of crashed links
-        self.crashed_links.append({'first' : node1, 'second' : node2})
+        self.crashed_links.append((node1, node2))
         
         return node1, node2
 
 
-    def simulate_link_resurrection(self, link_to_exclude = None):
+    def simulate_link_resurrection(self, link_to_exclude : tuple = None):
 
         # remove the link so it can't be chosen for resurrection
         if link_to_exclude is not None:
@@ -108,18 +108,18 @@ class Infrastructure(ABC):
             return None, None
         
         # choice the link to resurrect
-        link = random.choice(self.crashed_links)
+        node1, node2 = random.choice(self.crashed_links)
         
         # make it available
-        nx.set_edge_attributes(self.graph, { (link['first'], link['second']) : { 'available' : False }})
+        nx.set_edge_attributes(self.graph, { (node1, node2) : { 'available' : False }})
         
         # remove from the list of crashed links
-        self.crashed_links.remove(link)
+        self.crashed_links.remove((node1, node2))
 
         # re-insert the excluded link
         if link_to_exclude is not None:
             self.crashed_links.append(link_to_exclude)
         
 
-        return link['first'], link['second']
+        return node1, node2
     
