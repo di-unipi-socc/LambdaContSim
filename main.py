@@ -22,6 +22,13 @@ import global_variables as g
 from utils import get_recursive_dependents, take_decision, get_oldest
 import random
 
+# Statistical variables
+
+applications_stats : dict = {}
+node_events : list = []
+node_stats : dict[str, list] = {}
+link_events : list = []
+
 
 def print_usage():
     ''' Print application usage message'''
@@ -169,8 +176,7 @@ def place_application(
     application_name : str,
     config_application : dict,
     generator_id : str,
-    infrastructure : Infrastructure,
-    applications_stats : dict,
+    infrastructure : Infrastructure
 ):
 
     # get the logger
@@ -227,7 +233,8 @@ def place_application(
 
     # normal placement
     placement_data : dict = {
-        'event' : f'{generator_id} triggered',
+        'event' : 'placement',
+        'devices' : [generator_id],
         'start' : start_time,
         'end' : end_time,
         'success' : application_can_be_placed
@@ -265,9 +272,8 @@ def replace_application(
     application_obj : Application,
     starting_function : str,
     starting_nodes : list[str],
-    event : str,
-    infrastructure : Infrastructure,
-    applications_stats : dict,
+    crashed_nodes : list,
+    infrastructure : Infrastructure
 ):
     # get the logger
     logger = logs.get_logger()
@@ -329,7 +335,8 @@ def replace_application(
 
     # normal placement
     placement_data : dict = {
-        'event' : event, # TODO
+        'event' : 'crash',
+        'devices' : crashed_nodes,
         'start' : start_time,
         'end' : end_time,
         'success' : application_can_be_placed
@@ -360,10 +367,7 @@ def replace_application(
 def simulation(
     env : simpy.Environment,
     steps : int,
-    infrastructure : Infrastructure,
-    applications_stats : dict,
-    node_events : list,
-    link_events : list
+    infrastructure : Infrastructure
     ):
     
     # get logger
@@ -382,52 +386,52 @@ def simulation(
         # for each event generator
         for event_generator in infrastructure.event_generators:
 
-                # generator is triggering?
-                generator_triggered = take_decision(config.event_generator_trigger_probability)
+            # generator is triggering?
+            generator_triggered = take_decision(config.event_generator_trigger_probability)
 
-                if generator_triggered:
-                    logger.info(f'Generator {event_generator.generator_id} triggered')
+            if generator_triggered:
+                logger.info(f'Generator {event_generator.generator_id} triggered')
 
-                    # get the list of triggered events
-                    triggered_events = []
-                    for event, event_probability in event_generator.events:
+                # get the list of triggered events
+                triggered_events = []
+                for event, event_probability in event_generator.events:
+                    
+                    # event of that generator is triggering?
+                    event_triggered = take_decision(event_probability)
+
+                    if event_triggered:
+                        triggered_events.append(event)
+
+                # for each application, check if it is triggered by one of these events
+                for application_name in config.applications:
+
+                    config_application = config.applications[application_name]
+
+                    if config_application['trigger_event'] in triggered_events:
+
+                        # try to place the application
+                        logger.info(f"Event {config_application['trigger_event']} ({event_generator.generator_id}) triggered {application_name}")
                         
-                        # event of that generator is triggering?
-                        event_triggered = take_decision(event_probability)
+                        # get application path
+                        application_filename = config_application['filename']
+                        application_path = os.path.join(g.applications_path, application_filename)
 
-                        if event_triggered:
-                            triggered_events.append(event)
+                        # save application file into default path
+                        shutil.copy(application_path, g.secfaas2fog_application_path)
 
-                    # for each application, check if it is triggered by one of these events
-                    for application_name in config.applications:
+                        # place
+                        application_obj = place_application(application_name, config_application, event_generator.generator_id, infrastructure)
 
-                        config_application = config.applications[application_name]
+                        if application_obj is not None:
+                            # launch application
+                            thread = Orchestrator(env=env, application=application_obj)
+                            thread.start()
 
-                        if config_application['trigger_event'] in triggered_events:
+                            # add application into a list
+                            list_of_applications.append(application_obj)
 
-                            # try to place the application
-                            logger.info(f"Event {config_application['trigger_event']} ({event_generator.generator_id}) triggered {application_name}")
-                            
-                            # get application path
-                            application_filename = config_application['filename']
-                            application_path = os.path.join(g.applications_path, application_filename)
-
-                            # save application file into default path
-                            shutil.copy(application_path, g.secfaas2fog_application_path)
-
-                            # place
-                            application_obj = place_application(application_name, config_application, event_generator.generator_id, infrastructure, applications_stats)
-
-                            if application_obj is not None:
-                                # launch application
-                                thread = Orchestrator(env=env, application=application_obj)
-                                thread.start()
-
-                                # add application into a list
-                                list_of_applications.append(application_obj)
-
-                            # update infastructure.pl
-                            dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
+                        # update infastructure.pl
+                        dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
                 
 
         # CRASH/RESURRECTION PHASE
@@ -534,15 +538,14 @@ def simulation(
                 application_path = os.path.join(g.applications_path, application_obj.filename)
                 shutil.copy(application_path, g.secfaas2fog_application_path)
 
-                event = f"node(s) {[node for node in list(crashed_node_id.values()) if node]} crashed"
+                crashed_nodes = [node for node in list(crashed_node_id.values()) if node]
 
                 is_successfully_replaced, replaced_application_chain = replace_application(
                     application_obj,
                     start_function,
                     starting_nodes,
-                    event, 
-                    infrastructure, 
-                    applications_stats
+                    crashed_nodes,
+                    infrastructure
                 )
 
                 if is_successfully_replaced:
@@ -666,6 +669,15 @@ def simulation(
                 }
                 link_events.append(event)
         
+        # get nodes statistics
+        for node in infrastructure.nodes.values():
+            node_data = {
+                'consumption' : node.get_energy(),
+                'load' : node.get_load(),
+                'epoch' : step_number
+            }
+            node_stats[node.id].append(node_data)
+        
         # update list of applications
         list_of_applications += apps_just_added
 
@@ -689,11 +701,6 @@ def main(argv):
 
     # logging
     logger = logs.init_logger()
-
-    # statistical variables
-    applications_stats : dict = {}
-    node_events : list = []
-    link_events : list = []
 
     # configuration file path, set to default
     config_path = g.default_config_path
@@ -774,6 +781,10 @@ def main(argv):
 
         # save infrastructure file into default path
         shutil.copy(config.infr_filename, g.secfaas2fog_infrastructure_path)
+    
+    # initialize node stats dictionary
+    for node in infrastructure.nodes.values():
+        node_stats[node.id] = []
 
     # SIMPY PHASE
     
@@ -781,7 +792,7 @@ def main(argv):
     env = simpy.Environment()
 
     # start simulation
-    env.process(simulation(env, config.sim_num_of_epochs, infrastructure, applications_stats, node_events, link_events))
+    env.process(simulation(env, config.sim_num_of_epochs, infrastructure))
 
     # we simulate for sim_num_of_epochs epochs
     env.run(until=config.sim_num_of_epochs)
@@ -825,7 +836,7 @@ def main(argv):
         # enrich application stats
         application['num_of_placements'] = num_of_placements
         application['successes'] = successes
-        application['average_time_execution'] = float(f'{sum/num_of_placements}')
+        application['average_time_execution'] = 0 if num_of_placements == 0 else float(f'{sum/num_of_placements}')
         application['average_success_time_execution'] = 0 if successes == 0 else float(f'{success_sum/successes}')
         application['average_failure_time_execution'] = 0 if successes == num_of_placements else float(f'{failure_sum/(num_of_placements-successes)}')
 
@@ -837,14 +848,16 @@ def main(argv):
     stats_to_dump = {
         'total_placements' : global_number_of_placements,
         'total_successes' : global_successes,
-        'average_secfaas2fog_execution' : float(f'{global_sum/global_number_of_placements}'),
-        'node_events' : node_events,
+        'average_secfaas2fog_execution' : 0 if global_number_of_placements == 0 else float(f'{global_sum/global_number_of_placements}'),
+        'nodes' : {
+            'load' : node_stats,
+            'events' : node_events,
+        },
         'link_events' : link_events,
-        'data' : applications_stats
+        'applications' : applications_stats
     }
 
     logger.info("Number of placements: %d" % global_number_of_placements)
-    logger.info("Average time of SecFaas2Fog placement: " + str(float(f'{global_sum/global_number_of_placements:.2f}')) + " milliseconds")
     logger.info("Successess: %d" % global_successes)
 
     logger.info("Writing JSON's execution report on '%s'", config.sim_report_output_file)

@@ -1,6 +1,11 @@
 # return a list of functions that can be executed (their dependencies has been already executed)
 
 def get_ready_functions(application_chain: dict) -> list[str]:
+    '''
+    Returns the list of ready functions.
+    A ready function is a function without dependencies
+    '''
+
     to_return = []
     functions = application_chain.keys()
     for fun in functions:
@@ -11,6 +16,10 @@ def get_ready_functions(application_chain: dict) -> list[str]:
     return to_return
 
 def get_next_functions_by_id(application_chain: dict, function_id : str) -> list[str]:
+    '''
+    Returns the list of functions which depends from function_id.
+    '''
+
     to_return = []
     functions = application_chain.keys()
     for fun in functions:
@@ -21,6 +30,9 @@ def get_next_functions_by_id(application_chain: dict, function_id : str) -> list
     return to_return
 
 def delete_executed_function(application_chain: dict, finished_function):
+    '''
+    Delete finished_function from the chain
+    '''
     
     application_chain.pop(finished_function)
     
@@ -31,6 +43,9 @@ def delete_executed_function(application_chain: dict, finished_function):
             dependencies.remove(finished_function)
 
 def delete_functions_chain_by_id(application_chain: dict, function_to_remove) -> list:
+    '''
+    Delete a chain starting from function_to_remove from the chain
+    '''
     
     application_chain.pop(function_to_remove)
 
@@ -55,6 +70,9 @@ def delete_functions_chain_by_id(application_chain: dict, function_to_remove) ->
 
 
 def get_recursive_dependents(start_function : str, application_chain: dict) -> list:
+    '''
+    Returns the list of dependent functions of start_function
+    '''
     
     dependents = []
 
@@ -72,51 +90,55 @@ def get_recursive_dependents(start_function : str, application_chain: dict) -> l
     return list(set(to_return))
 
 
-def rec(boh : dict, function, chain, level):
+def find_functions_level(result : dict, function, chain, level):
+    '''
+    Find for each function in the chain its level of execution 
+    '''
 
-    list = get_next_functions_by_id(chain, function)
+    list_of_functions = get_next_functions_by_id(chain, function)
 
-    old_level = boh[function] if function in boh.keys() else 0
+    old_level = result[function] if function in result.keys() else 0
 
-    boh[function] = max(old_level, level)
+    result[function] = max(old_level, level)
 
-    if len(list) > 0:
-        for fun in list:
-            rec(boh, fun, chain, level + 1)
+    if len(list_of_functions) > 0:
+        for function_name in list_of_functions:
+            find_functions_level(result, function_name, chain, level + 1)
 
 
 def get_oldest(interested_functions : list, original_chain : dict[str, list]):
-    print(original_chain)
-    other = {}
-    rec(other, 'fLogin', original_chain, 0)
-    print(other)
+    '''
+    Returns the first function which is executed in the chain between a list of interested functions
+    '''
 
-    levelled_fun : dict[int, list] = {}
-
-    keys = other.keys()
-    for key in keys:
-        levelled_fun[other[key]] = []
-    for key in keys:
-        levelled_fun[other[key]].append(key)
+    first_function = get_ready_functions(original_chain)[0]
     
-    print(levelled_fun)
+    levels_by_function = {}
+    find_functions_level(levels_by_function, first_function, original_chain, 0)
 
-    # find the oldest between interested functions
+    functions_by_level : dict[int, list] = {}
+
+    functions = levels_by_function.keys()
+    for function_name in functions:
+        functions_by_level[levels_by_function[function_name]] = []
+    for function_name in functions:
+        functions_by_level[levels_by_function[function_name]].append(function_name)
+
+    # find the oldest between interested functions (by executing order)
     oldest = interested_functions[0]
     for function in interested_functions:
         if function == oldest:
             continue
-        if other[function] < other[oldest]:
+        if levels_by_function[function] < levels_by_function[oldest]:
             oldest = function
     
     found = False
 
     oldest_list = [oldest]
-    print(interested_functions)
     
     while not found:
         for oldest in oldest_list:
-            print(oldest)
+            
             # get dependent functions from the oldest
             oldest_dependents = get_recursive_dependents(oldest, original_chain)
 
@@ -126,18 +148,17 @@ def get_oldest(interested_functions : list, original_chain : dict[str, list]):
                 if function == oldest:
                     continue
                 if function not in oldest_dependents:
-                    print(function)
-                    print(oldest_dependents)
                     found = False
                     break
             
             if found:
                 return oldest
         
-        # search a new oldest
-        oldest_level = other[oldest]
+        # search a new oldest by downgrading the level
+        # we are sure that, at most, the function at level 0 will be the oldest
+        oldest_level = levels_by_function[oldest]
         oldest_level -= 1
-        oldest_list = levelled_fun[oldest_level]
+        oldest_list = functions_by_level[oldest_level]
 
     return None
 
