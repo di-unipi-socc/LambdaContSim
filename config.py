@@ -1,6 +1,7 @@
 import yaml
 import os
 import global_variables as g
+import logs
 
 def parse_config(path):
     
@@ -33,6 +34,10 @@ def parse_config(path):
     # APPLICATIONS
     global applications
 
+    # get logger
+
+    logger = logs.get_logger()
+
     with open(path, 'r') as f:
         
         # load config yaml file into a dictionary
@@ -40,52 +45,100 @@ def parse_config(path):
 
         # SIMULATOR
 
-        sim_report_output_file = config['simulator']['output_file']
-        sim_silent_mode = config['simulator']['silent_mode']
-        sim_num_of_epochs = config['simulator']['epochs']
-        sim_function_duration = config['simulator']['function_duration']
+        sim_report_output_file = str(config['simulator']['output_file'])
+        sim_silent_mode = bool(config['simulator']['silent_mode'])
+        sim_num_of_epochs = int(config['simulator']['epochs'])
+        sim_function_duration = int(config['simulator']['function_duration'])
 
-        # check function duration
+        sim_seed = int(config['simulator']['seed'])
+        sim_use_padding = bool(config['simulator']['use_padding'])
+        sim_max_placement_time = int(config['simulator']['max_placement_time'])
+
+        # SIMULATOR CHECKS
+
+        if not os.path.isfile(sim_report_output_file):
+            logger.error(f'Given report path is not a file')
+            return False
+        
+        if sim_num_of_epochs < 1:
+            logger.error("Number of epochs must be greater or equal 1")
+            return False
+        
         if sim_function_duration < 1:
-            sim_function_duration = 1
-
-        sim_seed = config['simulator']['seed']
-        sim_use_padding = config['simulator']['use_padding']
-        sim_max_placement_time = config['simulator']['max_placement_time'] # TODO must be equals or greater than 1
+            logger.error("Function duration must be greater or equal 1")
+            return False
+        
+        if sim_seed < -1:
+            logger.error("Simulator seed must be -1 (ignore seed) or greater or equal 0")
+            return False
+        
+        if sim_max_placement_time < 1:
+            logger.error("Max placement time must be greater or equal 1 (seconds)")
+            return False
 
         # EVENTS
 
-        event_generator_trigger_probability = config['events']['generator_trigger_probability']
-        event_min_probability = config['events']['event_min_probability']
-        event_max_probability = config['events']['event_max_probability']
+        event_generator_trigger_probability = float(config['events']['generator_trigger_probability'])
+        event_min_probability = float(config['events']['event_min_probability'])
+        event_max_probability = float(config['events']['event_max_probability'])
+
+        # EVENTS CHECK
+
+        if event_generator_trigger_probability > 1 or event_generator_trigger_probability < 0:
+            logger.error("Probability of trigger generator must be a value between 0 and 1")
+            return False
+        
+        if event_min_probability > 1 or event_min_probability < 0:
+            logger.error("Minimum probability of event trigger must be a value between 0 and 1")
+            return False
+        
+        if event_max_probability > 1 or event_max_probability < 0:
+            logger.error("Minimum probability of event trigger must be a value between 0 and 1")
+            return False
+        
+        if event_min_probability > event_max_probability:
+            logger.error("Minimum probability of event trigger can't be greater than maximum probability")
+            return False
 
         # INFRASTRUCTURE
 
-        infr_type = config['infrastructure']['type']
+        infr_type = str(config['infrastructure']['type'])
         if not infr_type in ['physical', 'logical']:
-            # TODO error message
+            logger.error("Only allowed value for infrastructure type are 'physical' and 'logical'")
             return False
         
         # if the infrastructur is logical, we need to take it from a Prolog file
         if infr_type == 'logical':
-            infr_temp_filename = config['infrastructure']['filename']
+            infr_temp_filename = str(config['infrastructure']['filename'])
             infr_filename = os.path.join(g.infrastructures_path, infr_temp_filename)
+
+            if not os.path.isfile(infr_filename):
+                logger.error("If infrastructure type is 'logical', a valid infrastructure file must be given")
+                return False
         else:
             infr_filename = ''
         
-        infr_is_dynamic = config['infrastructure']['is_dynamic']
+        infr_is_dynamic = bool(config['infrastructure']['is_dynamic'])
 
         if infr_is_dynamic:
 
             # Node crash and resurrection probabilities
 
-            infr_node_crash_probability = config['infrastructure']['crash_probability']
-            infr_node_resurrection_probability = config['infrastructure']['resurrection_probability']
+            infr_node_crash_probability = dict(config['infrastructure']['crash_probability'])
+            infr_node_resurrection_probability = dict(config['infrastructure']['resurrection_probability'])
+
+            for key in ['cloud', 'fog', 'edge']:
+                if key not in infr_node_crash_probability:
+                    logger.error(f'{key} is missing from infrastructure node crash probability')
+                    return False
+                if key not in infr_node_crash_probability:
+                    logger.error(f'{key} is missing from infrastructure node resurrection probability')
+                    return False
 
             # Link crash and resurrection probabilities
 
-            infr_link_crash_probability = config['infrastructure']['link_crash_probability']
-            infr_link_resurrection_probability = config['infrastructure']['link_resurrection_probability']
+            infr_link_crash_probability = float(config['infrastructure']['link_crash_probability'])
+            infr_link_resurrection_probability = float(config['infrastructure']['link_resurrection_probability'])
         else:
 
             # infrastructure is static -> no crashes or resurrections
@@ -103,21 +156,20 @@ def parse_config(path):
             infr_link_crash_probability = 0
             infr_link_resurrection_probability = 0
         
-        infr_energy = config['infrastructure']['energy']
+        infr_energy = dict(config['infrastructure']['energy'])
 
         # APPLICATIONS
         
-        applications = config['applications']
+        applications = dict(config['applications'])
 
-        # check that paths are correct
+        # APPLICATIONS CHECKS
+        
         for app_name in applications:
             app = applications[app_name]
             application_filename = app['filename']
             application_path = os.path.join(g.applications_path, application_filename)
             if not os.path.isfile(application_path):
-                # TODO log?
+                logger.error(f'{app_name} application path is not a file')
                 return False
-
-        # TODO check values
         
         return True
