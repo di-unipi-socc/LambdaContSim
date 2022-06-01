@@ -179,7 +179,8 @@ def place_application(
     application_name : str,
     config_application : dict,
     generator_id : str,
-    infrastructure : Infrastructure
+    infrastructure : Infrastructure,
+    epoch : int
 ):
 
     # get the logger
@@ -243,6 +244,7 @@ def place_application(
         'links' : [],
         'start' : start_time,
         'end' : end_time,
+        'epoch' : epoch,
         'success' : application_can_be_placed
     }
 
@@ -280,7 +282,8 @@ def replace_application(
     starting_nodes : list[str],
     crashed_nodes : list,
     crashed_link : list,
-    infrastructure : Infrastructure
+    infrastructure : Infrastructure,
+    epoch : int
 ):
     # get the logger
     logger = logs.get_logger()
@@ -347,6 +350,7 @@ def replace_application(
         'links' : crashed_link,
         'start' : start_time,
         'end' : end_time,
+        'epoch' : epoch,
         'success' : application_can_be_placed
     }
 
@@ -428,7 +432,13 @@ def simulation(
                         shutil.copy(application_path, g.secfaas2fog_application_path)
 
                         # place
-                        application_obj = place_application(application_name, config_application, event_generator.generator_id, infrastructure)
+                        application_obj = place_application(
+                            application_name,
+                            config_application,
+                            event_generator.generator_id,
+                            infrastructure,
+                            step_number
+                        )
 
                         if application_obj is not None:
                             # launch application
@@ -621,7 +631,8 @@ def simulation(
                     starting_nodes,
                     crashed_nodes,
                     crashed_link,
-                    infrastructure
+                    infrastructure,
+                    step_number
                 )
 
                 if is_successfully_replaced:
@@ -819,7 +830,9 @@ def main(argv):
             'load' : node_stats,
             'events' : node_events,
         },
-        'link_events' : link_events,
+        'links' : {
+            'events' : link_events,
+        },
         'applications' : applications_stats
     }
 
