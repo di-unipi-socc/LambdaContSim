@@ -648,12 +648,15 @@ def simulation(
 
         # get nodes statistics
         for node in infrastructure.nodes.values():
-            node_data = {
-                'consumption' : node.get_energy(),
-                'load' : node.get_load(),
-                'epoch' : step_number
-            }
-            node_stats[node.id].append(node_data)
+            load = node.get_load()
+            # in order to reduce the output report, don't save loads stat if load is 0
+            if load > 0:
+                node_data = {
+                    'consumption' : node.get_energy(),
+                    'load' : load,
+                    'epoch' : step_number
+                }
+                node_stats[node.id].append(node_data)
         
         # update list of applications
         list_of_applications += apps_just_added
