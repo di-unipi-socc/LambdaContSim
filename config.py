@@ -55,10 +55,6 @@ def parse_config(path):
         sim_max_placement_time = int(config['simulator']['max_placement_time'])
 
         # SIMULATOR CHECKS
-
-        if not os.path.isfile(sim_report_output_file):
-            logger.error(f'Given report path is not a file')
-            return False
         
         if sim_num_of_epochs < 1:
             logger.error("Number of epochs must be greater or equal 1")
