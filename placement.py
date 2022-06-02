@@ -25,8 +25,7 @@ def get_placement_query(placement_type : PlacementType, max_placement_time : int
             if generator_id is None:
                 return None
             
-            # once means that we take the first of the results
-            return f'once({query_command}({max_placement_time}, {generator_id}, {orchestration_id}, Placement)).'
+            return f'{query_command}({max_placement_time}, {generator_id}, {orchestration_id}, Placement).'
         
         case PlacementType.PADDED_REPLACEMENT | PlacementType.UNPADDED_REPLACEMENT:
             query_command = ''
@@ -42,11 +41,11 @@ def get_placement_query(placement_type : PlacementType, max_placement_time : int
             if starting_nodes is None or len(starting_nodes) == 0:
                 return None
             
-            to_return = f'once({query_command}({max_placement_time}, {starting_function}, ['
+            to_return = f'{query_command}({max_placement_time}, {starting_function}, ['
             for node in starting_nodes:
                 to_return += f'{node},'
             to_return = to_return.removesuffix(',')
-            to_return += f'], {orchestration_id}, Placement)).'
+            to_return += f'], {orchestration_id}, Placement).'
 
             return to_return
 
