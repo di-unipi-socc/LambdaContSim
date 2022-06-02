@@ -139,7 +139,7 @@ def get_raw_placement(placement_type : PlacementType, orchestration_id : str, ge
         )
     
     if query is None:
-        return None, None, None
+        return None, None
     
     # try to place this app with SecFaas2Fog
 
@@ -165,14 +165,19 @@ def get_raw_placement(placement_type : PlacementType, orchestration_id : str, ge
             finally:
                 # save SecFaas2Fog finish time
                 end_time = datetime.now()
+    
+    # calculate time of execution
+    end_millisec = end_time.timestamp() * 1000
+    start_millisec = start_time.timestamp() * 1000
+    execution_time = end_millisec - start_millisec
 
     if query_result != False and isinstance(query_result, list):
                     
         raw_placement = query_result[0] # it is a dictionary
         
-        return raw_placement, start_time, end_time
+        return raw_placement, execution_time
     
-    return {}, start_time, end_time
+    return {}, execution_time
     
 
 def place_application(
@@ -194,7 +199,7 @@ def place_application(
     # try to place this app with SecFaas2Fog
 
     # it will reply with a valid placement iff application can be placed
-    raw_placement, start_time, end_time = get_raw_placement(
+    raw_placement, execution_time = get_raw_placement(
         placement_type=placement_type,
         orchestration_id=config.applications[application_name]['orchestration_id'],
         generator_id=generator_id
@@ -242,8 +247,7 @@ def place_application(
         'event' : 'placement',
         'nodes' : [generator_id],
         'links' : [],
-        'start' : start_time,
-        'end' : end_time,
+        'duration' : execution_time,
         'epoch' : epoch,
         'success' : application_can_be_placed
     }
@@ -299,7 +303,7 @@ def replace_application(
     # try to place this app with SecFaas2Fog
 
     # it will reply with a valid placement iff application can be placed
-    raw_placement, start_time, end_time = get_raw_placement(
+    raw_placement, execution_time = get_raw_placement(
         placement_type=placement_type,
         starting_function=starting_function,
         starting_nodes=starting_nodes,
@@ -348,8 +352,7 @@ def replace_application(
         'event' : 'crash',
         'nodes' : crashed_nodes,
         'links' : crashed_link,
-        'start' : start_time,
-        'end' : end_time,
+        'duration' : execution_time,
         'epoch' : epoch,
         'success' : application_can_be_placed
     }
@@ -725,7 +728,7 @@ def main(argv):
     
     # if silent mode is active don't show info messages but only errors and criticals
     if config.sim_silent_mode:
-        logger.info("Silent mode is now active")
+        logger.info("Silent mode is now active, only errors will be shown")
         logger.setLevel(logging.ERROR)
     
     # Seed for deterministic execution
@@ -796,9 +799,7 @@ def main(argv):
         
         for result in placement_results:
             
-            end_millisec = result['end'].timestamp() * 1000
-            start_millisec = result['start'].timestamp() * 1000
-            exec_time = end_millisec - start_millisec
+            exec_time = result['duration']
             sum += exec_time
             
             if result['success'] :
