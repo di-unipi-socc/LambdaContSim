@@ -461,9 +461,6 @@ def simulation(
         second_node = None
         first_crashed_node = None
         second_crashed_node = None
-        
-        # list of replacing applications
-        apps_just_added : list[Application] = []
 
         # NODE crash
         for category in ['cloud', 'fog', 'edge']:
@@ -657,9 +654,6 @@ def simulation(
                     'epoch' : step_number
                 }
                 node_stats[node.id].append(node_data)
-        
-        # update list of applications
-        list_of_applications += apps_just_added
 
         # recalculate all paths between nodes of the physical infrastructure
         if type(infrastructure) is PhysicalInfrastructure:
