@@ -205,6 +205,9 @@ def place_application(
         generator_id=generator_id
     )
 
+    # get the node where the generator is placed
+    generator_node = [gen for gen in infrastructure.event_generators if gen.generator_id == generator_id][0].source_node
+
     application_can_be_placed = False
 
     if raw_placement is None:
@@ -222,8 +225,6 @@ def place_application(
             dependencies = application_chain[function_name]
             if len(dependencies) == 0:
                 # starting function
-                # get the node where the generator is placed
-                generator_node = [gen for gen in infrastructure.event_generators if gen.generator_id == generator_id][0].source_node
                 placed_function.previous_nodes.append(generator_node)
             else:
                 for dependency in dependencies:
@@ -245,7 +246,7 @@ def place_application(
     # normal placement
     placement_data : dict = {
         'event' : 'placement',
-        'nodes' : [generator_id],
+        'nodes' : [generator_node],
         'links' : [],
         'duration' : execution_time,
         'epoch' : epoch,
