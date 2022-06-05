@@ -781,7 +781,11 @@ def main(argv):
 
     global_number_of_placements = 0 # total number of placements (for all applications)
     global_successes = 0
-    global_sum = 0
+    global_time_sum = 0
+    global_success_time_sum = 0
+    global_failure_time_sum = 0
+
+    # calculate execution times
 
     applications_stats_keys = applications_stats.keys()
 
@@ -792,39 +796,51 @@ def main(argv):
         # local accumulators
         num_of_placements = len(application['placements'])
         successes = 0
-        sum = 0
-        success_sum = 0
-        failure_sum = 0
+        time_sum = 0
+        success_time_sum = 0
+        failure_time_sum = 0
 
         placement_results = application['placements']
         
         for result in placement_results:
             
             exec_time = result['duration']
-            sum += exec_time
+            time_sum += exec_time
             
             if result['success'] :
-                success_sum += exec_time
+                success_time_sum += exec_time
+                global_success_time_sum += exec_time
                 successes += 1
             else:
-                failure_sum += exec_time
+                failure_time_sum += exec_time
+                global_failure_time_sum += exec_time
         
         # enrich application stats
         application['num_of_placements'] = num_of_placements
         application['successes'] = successes
-        application['average_time_execution'] = 0 if num_of_placements == 0 else float(f'{sum/num_of_placements}')
-        application['average_success_time_execution'] = 0 if successes == 0 else float(f'{success_sum/successes}')
-        application['average_failure_time_execution'] = 0 if successes == num_of_placements else float(f'{failure_sum/(num_of_placements-successes)}')
+        application['avg_execution_time'] = 0 if num_of_placements == 0 else float(f'{time_sum/num_of_placements}')
+        application['avg_success_execution_time'] = 0 if successes == 0 else float(f'{success_time_sum/successes}')
+        application['avg_failure_execution_time'] = 0 if successes == num_of_placements else float(f'{failure_time_sum/(num_of_placements-successes)}')
 
         # accumulate global variables
         global_number_of_placements += num_of_placements
         global_successes += successes
-        global_sum += sum
+        global_time_sum += time_sum
     
+    # calculate global times
+    avg_exec_time = 0 if global_number_of_placements == 0 else float(f'{global_time_sum/global_number_of_placements}')
+    avg_success_exec_time = 0 if global_successes == 0 else float(f'{global_success_time_sum/global_successes}')
+    avg_failure_exec_time = 0 if global_successes == global_number_of_placements else float(f'{global_failure_time_sum/(global_number_of_placements-global_successes)}')
+
     stats_to_dump = {
-        'total_placements' : global_number_of_placements,
-        'total_successes' : global_successes,
-        'average_secfaas2fog_execution' : 0 if global_number_of_placements == 0 else float(f'{global_sum/global_number_of_placements}'),
+        'general' : {
+            'epochs' : config.sim_num_of_epochs,
+            'total_placements' : global_number_of_placements,
+            'total_successes' : global_successes,
+            'avg_execution_time' : avg_exec_time,
+            'avg_success_execution_time' : avg_success_exec_time,
+            'avg_failure_execution_time' : avg_failure_exec_time,
+        },
         'nodes' : {
             'load' : node_stats,
             'events' : node_events,
@@ -838,7 +854,9 @@ def main(argv):
     logger.info("Number of placements: %d" % global_number_of_placements)
     logger.info("Successess: %d" % global_successes)
 
-    logger.info("Writing JSON's execution report on '%s'", config.sim_report_output_file)
+    # write the report
+
+    logger.info(f"Writing JSON's execution report on '{config.sim_report_output_file}'...")
 
     with open(config.sim_report_output_file, 'w') as file:
         json.dump(stats_to_dump, indent = 4, default = str, fp = file)
