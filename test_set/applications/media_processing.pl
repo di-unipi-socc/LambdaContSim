@@ -2,8 +2,8 @@
 
 
 % functionReqs(functionId, listOfSWReqs, HWReqs(memory, vCPU, Htz), timeout, listOfServiceReqs(serviceType, latency))
-functionReqs(fDocAnalysis, [py3], (1024, 2, 500), [(bucket, 160)]).
-functionReqs(fProcDoc, [js], (1024, 1, 800), [(userDB, 210)]).
+functionReqs(fDocAnalysis, [py3], (1024, 2, 500), [(bucket, 30)]).
+functionReqs(fProcDoc, [js], (1024, 1, 800), [(userDB, 27)]).
 functionReqs(fPayAppr, [py3], (256, 2, 400), []).
 functionReqs(fNotify, [py3], (128, 2, 500), []).
 functionReqs(fArchive, [py3], (256, 2, 500), []).
@@ -19,15 +19,15 @@ functionBehaviour(fArchive, [Head,Value],[],[Head,Value]).
 %               listOfFunctions(functionId(listOfServiceInstances), latencyFromPrevious)
 
 functionOrch(
-  mediaOrch,(event2, [low,top,medium]), %trigger
+  mediaOrch,(event6, [low,top,medium]), %trigger
   seq(
-    fun(fDocAnalysis,[],220),
+    fun(fDocAnalysis,[],23),
     seq(
-      fun(fProcDoc,[],200),
+      fun(fProcDoc,[],32),
       if(
-        fun(fPayAppr,[],180),
-        fun(fNotify,[],220),
-        fun(fArchive,[],200)
+        fun(fPayAppr,[],23),
+        fun(fNotify,[],24),
+        fun(fArchive,[],27)
       )
     )
   )

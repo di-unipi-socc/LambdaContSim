@@ -2,11 +2,11 @@
 
 
 % functionReqs(functionId, listOfSWReqs, HWReqs(memory, vCPU, Htz), listOfServiceReqs(serviceType, latency))
-functionReqs(fCheck, [py3], (512, 2, 500), [(database, 200)]).
+functionReqs(fCheck, [py3], (512, 2, 500), [(database, 21)]).
 functionReqs(fBuyOrSell, [py3], (2048, 4, 1200), []).
 functionReqs(fSell, [js, py3], (256, 2, 400), []).
 functionReqs(fBuy, [js, py3], (256, 2, 400), []).
-functionReqs(fRecord, [py3], (1600, 2, 500), [(database, 200)]).
+functionReqs(fRecord, [py3], (1600, 2, 500), [(database, 22)]).
 
 %functionBehaviour(functionId, listOfInputs, listOfun(serviceReq, TypeParam), listOfOutputs)
 functionBehaviour(fCheck, [Stock, Value, Purchase],[Stock],[Stock, Value, Purchase]).
@@ -21,14 +21,14 @@ functionBehaviour(fRecord, [_, Value],[],[Value]).
 functionOrch(
   stockOrch,(event2, [medium,low, top]), %trigger
   seq(
-    fun(fCheck,[],250),
+    fun(fCheck,[],25),
     seq(
       if(
-          fun(fBuyOrSell,[],150),
-          fun(fSell,[],105),
-          fun(fBuy,[],180)
+          fun(fBuyOrSell,[],15),
+          fun(fSell,[],14),
+          fun(fBuy,[],22)
       ),
-      fun(fRecord,[],180)
+      fun(fRecord,[],24)
     )
   )
 ).
