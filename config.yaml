@@ -1,5 +1,5 @@
 simulator:
-  output_file : './report.json'
+  output_file_prefix : 'report'
   silent_mode : false
   epochs : 100
   function_duration : 1

@@ -2,6 +2,7 @@ import yaml
 import os
 import global_variables as g
 import logs
+from datetime import datetime
 
 def parse_config(path):
     
@@ -45,7 +46,6 @@ def parse_config(path):
 
         # SIMULATOR
 
-        sim_report_output_file = str(config['simulator']['output_file'])
         sim_silent_mode = bool(config['simulator']['silent_mode'])
         sim_num_of_epochs = int(config['simulator']['epochs'])
         sim_function_duration = int(config['simulator']['function_duration'])
@@ -53,6 +53,20 @@ def parse_config(path):
         sim_seed = int(config['simulator']['seed'])
         sim_use_padding = bool(config['simulator']['use_padding'])
         sim_max_placement_time = int(config['simulator']['max_placement_time'])
+
+        temp_file_prefix = str(config['simulator']['output_file_prefix'])
+        
+        # file prefix is 'report' if the used doesn't write it
+        file_prefix = 'report' if temp_file_prefix == '' else temp_file_prefix
+        datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        file_basename = file_prefix + " " + datetime_str + ".json"
+        report_folder_path = os.path.join(os.getcwd(), 'reports')
+        file_path = os.path.join(report_folder_path, file_basename)
+
+        # create report folder if it doesn't exist
+        os.makedirs(report_folder_path, exist_ok = True)
+
+        sim_report_output_file = file_path
 
         # SIMULATOR CHECKS
         
