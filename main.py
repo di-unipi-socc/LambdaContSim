@@ -27,7 +27,7 @@ import networkx as nx
 
 applications_stats : dict = {}
 node_events : list = []
-node_stats : dict[str, list] = {}
+node_stats : dict[str, dict] = {}
 link_events : list = []
 
 
@@ -241,19 +241,20 @@ def place_application(
 
     if application_name not in applications_stats.keys():
         applications_stats[application_name] = {}
-        applications_stats[application_name]['placements'] = []
+        applications_stats[application_name]['placements'] = {}
+        applications_stats[application_name]['placements']['data'] = []
+        applications_stats[application_name]['replacements'] = {}
+        applications_stats[application_name]['replacements']['data'] = []
 
     # normal placement
     placement_data : dict = {
-        'event' : 'placement',
-        'nodes' : [generator_node],
-        'links' : [],
+        'node' : generator_node,
         'duration' : execution_time,
         'epoch' : epoch,
         'success' : application_can_be_placed
     }
 
-    applications_stats[application_name]['placements'].append(placement_data)
+    applications_stats[application_name]['placements']['data'].append(placement_data)
 
     if application_can_be_placed :
 
@@ -311,6 +312,10 @@ def replace_application(
         orchestration_id=config.applications[application_name]['orchestration_id']
     )
 
+    # if the excution time is much more (for us, 2 times more) than maximum allowed time it can be a problem
+    if execution_time > config.sim_max_placement_time * 2:
+        logger.error(f'Replacement of application {application_obj.id} took {execution_time} milliseconds')
+
     application_can_be_placed = False
 
     if raw_placement is None:
@@ -344,21 +349,16 @@ def replace_application(
 
         logger.info("Replacement found for %s", application_obj.id)
 
-    if application_name not in applications_stats.keys():
-        applications_stats[application_name] = {}
-        applications_stats[application_name]['placements'] = []
-
-    # normal placement
+    #  replacement
     placement_data : dict = {
-        'event' : 'crash',
-        'nodes' : crashed_nodes,
-        'links' : crashed_link,
+        'crashed_nodes' : crashed_nodes,
+        'crashed_links' : crashed_link,
         'duration' : execution_time,
         'epoch' : epoch,
         'success' : application_can_be_placed
     }
 
-    applications_stats[application_name]['placements'].append(placement_data)
+    applications_stats[application_name]['replacements']['data'].append(placement_data)
 
     if application_can_be_placed :
 
@@ -655,9 +655,8 @@ def simulation(
                 node_data = {
                     'consumption' : node.get_energy(),
                     'load' : load,
-                    'epoch' : step_number
                 }
-                node_stats[node.id].append(node_data)
+                node_stats[node.id][step_number] = node_data
 
         # recalculate all paths between nodes of the physical infrastructure
         if type(infrastructure) is PhysicalInfrastructure:
@@ -762,7 +761,7 @@ def main(argv):
     
     # initialize node stats dictionary
     for node in infrastructure.nodes.values():
-        node_stats[node.id] = []
+        node_stats[node.id] = {}
 
     # SIMPY PHASE
     
@@ -779,11 +778,34 @@ def main(argv):
 
     logger.info("--- STATISTICS ---")
 
-    global_number_of_placements = 0 # total number of placements (for all applications)
-    global_successes = 0
-    global_time_sum = 0
-    global_success_time_sum = 0
-    global_failure_time_sum = 0
+    # accumulators for all applications
+    tempted_placements = {
+        'placements' : 0,
+        'replacements' : 0,
+        'global' : 0
+    }
+    successes = {
+        'placements' : 0,
+        'replacements' : 0,
+        'global' : 0
+    }
+    time_sum = {
+        'placements' : {
+            'successes' : 0,
+            'failures' : 0,
+            'total' : 0
+        },
+        'replacements' : {
+            'successes' : 0,
+            'failures' : 0,
+            'total' : 0
+        },
+        'global' : {
+            'successes' : 0,
+            'failures' : 0,
+            'total' : 0
+        }
+    }
 
     # calculate execution times
 
@@ -792,54 +814,96 @@ def main(argv):
     for app_name in applications_stats_keys:
 
         application = applications_stats[app_name]
-        
-        # local accumulators
-        num_of_placements = len(application['placements'])
-        successes = 0
-        time_sum = 0
-        success_time_sum = 0
-        failure_time_sum = 0
 
-        placement_results = application['placements']
-        
-        for result in placement_results:
-            
-            exec_time = result['duration']
-            time_sum += exec_time
-            
-            if result['success'] :
-                success_time_sum += exec_time
-                global_success_time_sum += exec_time
-                successes += 1
-            else:
-                failure_time_sum += exec_time
-                global_failure_time_sum += exec_time
-        
-        # enrich application stats
-        application['num_of_placements'] = num_of_placements
-        application['successes'] = successes
-        application['avg_execution_time'] = 0 if num_of_placements == 0 else float(f'{time_sum/num_of_placements}')
-        application['avg_success_execution_time'] = 0 if successes == 0 else float(f'{success_time_sum/successes}')
-        application['avg_failure_execution_time'] = 0 if successes == num_of_placements else float(f'{failure_time_sum/(num_of_placements-successes)}')
+        # Scan application's placement and replacement data
 
-        # accumulate global variables
-        global_number_of_placements += num_of_placements
-        global_successes += successes
-        global_time_sum += time_sum
+        for placement_type in ['placements', 'replacements']:
+        
+            # application's data accumulators
+            app_tempted_placements = len(application[placement_type]['data'])
+            app_successes = 0
+            app_time_sum = {
+                'successes' : 0,
+                'failures' : 0,
+                'total' : 0
+            }
+
+            placement_results = application[placement_type]['data']
+            
+            for result in placement_results:
+                
+                execution_time = result['duration']
+                app_time_sum['total'] += execution_time
+                
+                if result['success'] :
+                    app_time_sum['successes'] += execution_time
+                    time_sum[placement_type]['successes'] += execution_time
+                    app_successes += 1
+                else:
+                    app_time_sum['failures'] += execution_time
+                    time_sum[placement_type]['failures'] += execution_time
+            
+            # enrich application stats
+            application[placement_type]['attempts'] = app_tempted_placements
+            application[placement_type]['successes'] = app_successes
+            application[placement_type]['avg_execution_time'] = 0 if app_tempted_placements == 0 else float(f'{app_time_sum["total"]/app_tempted_placements}')
+            application[placement_type]['avg_success_execution_time'] = 0 if app_successes == 0 else float(f'{app_time_sum["successes"]/app_successes}')
+            application[placement_type]['avg_failure_execution_time'] = 0 if app_successes == app_tempted_placements else float(f'{app_time_sum["failures"]/(app_tempted_placements-app_successes)}')
+
+            # accumulate variables
+            tempted_placements['global'] += app_tempted_placements
+            tempted_placements[placement_type] += app_tempted_placements
+            
+            successes['global'] += app_successes
+            successes[placement_type] += app_successes
+            
+            time_sum[placement_type]['total'] += app_time_sum["total"]
+            
+            time_sum['global']['successes'] += app_time_sum["successes"]
+            time_sum['global']['failures'] += app_time_sum["failures"]
+            time_sum['global']['total'] += app_time_sum["total"]
     
-    # calculate global times
-    avg_exec_time = 0 if global_number_of_placements == 0 else float(f'{global_time_sum/global_number_of_placements}')
-    avg_success_exec_time = 0 if global_successes == 0 else float(f'{global_success_time_sum/global_successes}')
-    avg_failure_exec_time = 0 if global_successes == global_number_of_placements else float(f'{global_failure_time_sum/(global_number_of_placements-global_successes)}')
+    # calculate average times
+    avg_total_exec_time = {
+        'placements' : 0 if tempted_placements['placements'] == 0 else float(f"{time_sum['placements']['total']/tempted_placements['placements']}"),
+        'replacements' : 0 if tempted_placements['replacements'] == 0 else float(f"{time_sum['replacements']['total']/tempted_placements['replacements']}"),
+        'global' : 0 if tempted_placements['global'] == 0 else float(f"{time_sum['global']['total']/tempted_placements['global']}")
+    }
+    avg_success_exec_time = {
+        'placements' : 0 if successes['placements'] == 0 else float(f"{time_sum['placements']['successes']/successes['placements']}"),
+        'replacements' : 0 if successes['replacements'] == 0 else float(f"{time_sum['replacements']['successes']/successes['replacements']}"),
+        'global' : 0 if successes['global'] == 0 else float(f"{time_sum['global']['successes']/successes['global']}")
+    }
+    avg_failure_exec_time = {
+        'placements' : 0 if tempted_placements['placements'] == successes['placements'] else float(f"{time_sum['placements']['failures']/(tempted_placements['placements']-successes['placements'])}"),
+        'replacements' : 0 if tempted_placements['replacements'] == successes['replacements'] else float(f"{time_sum['replacements']['failures']/(tempted_placements['replacements']-successes['replacements'])}"),
+        'global' : 0 if tempted_placements['global'] == successes['global'] else float(f"{time_sum['global']['failures']/(tempted_placements['global']-successes['global'])}")
+    }
 
     stats_to_dump = {
         'general' : {
             'epochs' : config.sim_num_of_epochs,
-            'total_placements' : global_number_of_placements,
-            'total_successes' : global_successes,
-            'avg_execution_time' : avg_exec_time,
-            'avg_success_execution_time' : avg_success_exec_time,
-            'avg_failure_execution_time' : avg_failure_exec_time,
+            'global' : {
+                'total_attempts' : tempted_placements['global'],
+                'total_successes' : successes['global'],
+                'avg_total_execution_time' : avg_total_exec_time['global'],
+                'avg_success_execution_time' : avg_success_exec_time['global'],
+                'avg_failure_execution_time' : avg_failure_exec_time['global'],
+            },
+            'placements' : {
+                'total_attempts' : tempted_placements['placements'],
+                'total_successes' : successes['placements'],
+                'avg_total_execution_time' : avg_total_exec_time['placements'],
+                'avg_success_execution_time' : avg_success_exec_time['placements'],
+                'avg_failure_execution_time' : avg_failure_exec_time['placements'],
+            },
+            'replacements' : {
+                'total_attempts' : tempted_placements['replacements'],
+                'total_successes' : successes['replacements'],
+                'avg_total_execution_time' : avg_total_exec_time['replacements'],
+                'avg_success_execution_time' : avg_success_exec_time['replacements'],
+                'avg_failure_execution_time' : avg_failure_exec_time['replacements'],
+            }
         },
         'nodes' : {
             'load' : node_stats,
@@ -851,8 +915,12 @@ def main(argv):
         'applications' : applications_stats
     }
 
-    logger.info("Number of placements: %d" % global_number_of_placements)
-    logger.info("Successess: %d" % global_successes)
+    logger.info("Total number of placements: %d" % tempted_placements['placements'])
+    logger.info("Successess: %d" % successes['placements'])
+    logger.info("Total number of replacements: %d" % tempted_placements['replacements'])
+    logger.info("Successess: %d" % successes['replacements'])
+    logger.info("Total number of both: %d" % tempted_placements['global'])
+    logger.info("Successess: %d" % successes['global'])
 
     # write the report
 
