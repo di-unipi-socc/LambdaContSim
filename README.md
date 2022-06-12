@@ -1,4 +1,4 @@
-# SimFaas2Fog (Simulator for SecFaas2Fog)
+# λ-FogSim (LambdaFogSim)
 
 ## Instructions
 
