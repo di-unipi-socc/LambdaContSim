@@ -31,9 +31,9 @@ def init():
     global default_config_path
     global generated_infrastructure_path
 
-    # define where SecFaas2Fog is
+    # define where SecFaaS2Fog is
     import os
-    secfaas2fog_path = os.path.join(os.curdir, 'SecFaas2Fog')
+    secfaas2fog_path = os.path.join(os.curdir, 'SecFaaS2Fog')
 
     # default Prolog files path
     secfaas2fog_placer_path = os.path.join(secfaas2fog_path, 'placer.pl')
