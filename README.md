@@ -1,13 +1,16 @@
 # λ-FogSim (LambdaFogSim)
 
+## Requirements
+
+In order to execute LambdaFogSim, make sure to have installed `Python 3.10` or above.
+
+You also have to install SWI-Prolog[https://www.swi-prolog.org/download/stable] for your platform.
+
 ## Instructions
 
 ### Initialisation
 
-Make sure to have installed `Python 3.10` or above.
-
-To setup the project initially you have to run these commands
-inside the project's root.
+To setup a virtual enviroment run these commands inside the project's root.
 
 `virtualenv -p python3 venv`
 
