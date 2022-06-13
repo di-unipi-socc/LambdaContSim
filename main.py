@@ -109,7 +109,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
 
 def get_raw_placement(placement_type : PlacementType, orchestration_id : str, generator_id : str = None, starting_function : str = None, starting_nodes : list[str] = None):
     '''
-    Returns the application placement found by SecFaas2Fog.
+    Returns the application placement found by SecFaaS2Fog.
     Returns a 3-tuple (placement, execution start, execution end):
     placement is None if query is not good
     placement is an empty dictionary if the application cannot be placed
@@ -141,7 +141,7 @@ def get_raw_placement(placement_type : PlacementType, orchestration_id : str, ge
     if query is None:
         return None, None
     
-    # try to place this app with SecFaas2Fog
+    # try to place this app with SecFaaS2Fog
 
     # it will reply with a valid placement iff application can be placed
     raw_placement = None
@@ -154,7 +154,7 @@ def get_raw_placement(placement_type : PlacementType, orchestration_id : str, ge
 
             try:
 
-                # save SecFaas2Fog starting time
+                # save SecFaaS2Fog starting time
                 start_time = datetime.now()
             
                 query_result = prolog_thread.query(query)
@@ -163,7 +163,7 @@ def get_raw_placement(placement_type : PlacementType, orchestration_id : str, ge
                 logger.error("Prolog execution failed")
             
             finally:
-                # save SecFaas2Fog finish time
+                # save SecFaaS2Fog finish time
                 end_time = datetime.now()
     
     # calculate time of execution
@@ -196,7 +196,7 @@ def place_application(
     if not config.sim_use_padding:
         placement_type = PlacementType.UNPADDED_PLACEMENT
 
-    # try to place this app with SecFaas2Fog
+    # try to place this app with SecFaaS2Fog
 
     # it will reply with a valid placement iff application can be placed
     raw_placement, execution_time = get_raw_placement(
@@ -302,7 +302,7 @@ def replace_application(
     # get application name
     application_name = application_obj.name
 
-    # try to place this app with SecFaas2Fog
+    # try to place this app with SecFaaS2Fog
 
     # it will reply with a valid placement iff application can be placed
     raw_placement, execution_time = get_raw_placement(
@@ -313,7 +313,7 @@ def replace_application(
     )
 
     # if the excution time is much more (for us, 2 times more) than maximum allowed time it can be a problem
-    if execution_time > config.sim_max_placement_time * 2:
+    if execution_time > config.sim_max_placement_time * 2000:
         logger.error(f'Replacement of application {application_obj.id} took {execution_time} milliseconds')
 
     application_can_be_placed = False
