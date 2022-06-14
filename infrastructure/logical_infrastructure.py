@@ -68,7 +68,7 @@ class LogicalInfrastructure(Infrastructure) :
                     nodes[node_id] = node_obj
 
                     # add the node to the graph
-                    graph.add_node(node_id, available = True)
+                    graph.add_node(node_id)
 
                 elif line.startswith('latency'):
                     line = line.replace(' ', '')
@@ -129,7 +129,7 @@ class LogicalInfrastructure(Infrastructure) :
                     services.append(service)
             
             # add edges to the graph
-            graph.add_weighted_edges_from(edges, available = True)
+            graph.add_weighted_edges_from(edges)
 
             # find shortest path lengths between nodes
             network_latencies = dict(nx.all_pairs_dijkstra_path_length(graph))

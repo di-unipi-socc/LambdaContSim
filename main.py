@@ -51,12 +51,12 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     # get crashed links
     crashed_links = infrastructure.crashed_links
     # get graph nodes
-    graph_nodes = infrastructure.graph.nodes(data=True)
+    graph_nodes = infrastructure.graph.nodes()
     
-    for (node_id, node_data) in graph_nodes:
+    for node_id in graph_nodes:
         node_obj = nodes_dict[node_id]
         # if the node is not available, don't write it
-        if node_data['available']:
+        if node_id not in crashed_nodes:
             node_string = f"node({node_obj.id}, {node_obj.category.value}, {node_obj.provider}, ["
             for sec_cap in node_obj.security_capabilites:
                 node_string += sec_cap + ", "
@@ -96,7 +96,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     latencies = infrastructure.latencies
 
     # get nodes as list
-    nodes_list : list[str] = [node_id for (node_id, _) in graph_nodes]
+    nodes_list : list[str] = list(graph_nodes)
 
     for index1 in range(0, len(nodes_list)):
         

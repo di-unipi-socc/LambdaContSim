@@ -86,7 +86,7 @@ def generate_infrastructure():
             nodes_by_category[category].append(node_obj)
 
             # add the node to the graph
-            graph.add_node(node_id, available = True)
+            graph.add_node(node_id)
 
     # connect all nodes of same category
     edges = []
@@ -165,7 +165,7 @@ def generate_infrastructure():
                 edges.append(edge)
     
     # add edges to the graph
-    graph.add_weighted_edges_from(edges, available = True)
+    graph.add_weighted_edges_from(edges)
     
     # find shortest path lengths between nodes
     
