@@ -485,9 +485,9 @@ def simulation(
                             # add application into a list
                             list_of_applications.append(application_obj)
 
-                        # update infastructure.pl
-                        dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
-                
+                            # application placed - update infastructure.pl
+                            logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+                            dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # CRASH/RESURRECTION PHASE
 
@@ -498,6 +498,9 @@ def simulation(
         second_node = None
         first_crashed_node = None
         second_crashed_node = None
+        
+        # True iff the infrastructure needs to be dumped
+        infrastructure_needs_update = False
 
         # NODE crash
         for category in ['cloud', 'fog', 'edge']:
@@ -513,6 +516,9 @@ def simulation(
                 
                 if crashed_node_id[category] is not None:
                     logger.info("Node %s crashed", crashed_node_id[category])
+
+                    # infrastructure needs dump
+                    infrastructure_needs_update = True
                     
                     # add event to the list
                     event = {
@@ -532,6 +538,9 @@ def simulation(
                 if resurrected_node_id is not None:
                     logger.info("Node %s resurrected", resurrected_node_id)
 
+                    # infrastructure needs dump
+                    infrastructure_needs_update = True
+
                     # add event to the list
                     event = {
                         'type' : 'resurrection',
@@ -540,7 +549,8 @@ def simulation(
                     }
                     node_events.append(event)
 
-        crashed_nodes = list(crashed_node_id.values())
+        # clean crashed nodes dict deleting Null references and trasform it into a list
+        crashed_nodes = [node for node in list(crashed_node_id.values()) if node]
 
         # LINK crash
         link_crashed = take_decision(config.infr_link_crash_probability)
@@ -554,6 +564,9 @@ def simulation(
             
             if first_crashed_node != None and second_crashed_node != None:
                 logger.info("Link %s <-> %s crashed", first_crashed_node, second_crashed_node)
+
+                # infrastructure needs dump
+                infrastructure_needs_update = True
 
                 # add event to the list
                 event = {
@@ -578,6 +591,9 @@ def simulation(
             if first_node != None and second_node != None:
                 logger.info("Link %s <-> %s resurrected", first_node, second_node)
 
+                # infrastructure needs dump
+                infrastructure_needs_update = True
+
                 # add event to the list
                 event = {
                     'type' : 'resurrection',
@@ -586,6 +602,15 @@ def simulation(
                     'epoch' : step_number
                 }
                 link_events.append(event)
+
+        # if something crashed recalculate all paths between nodes of the physical infrastructure
+        if infrastructure_needs_update:
+            if type(infrastructure) is PhysicalInfrastructure:
+                infrastructure.recalculate_routes()
+            
+            # nodes or links crashed - update infastructure.pl
+            logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+            dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # there are affected applications?
         for application_obj in list_of_applications:
@@ -657,9 +682,6 @@ def simulation(
                 application_path = os.path.join(g.applications_path, application_obj.filename)
                 shutil.copy(application_path, g.secfaas2fog_application_path)
 
-                # clean crashed nodes dict deleting null references and trasform it into a list
-                crashed_nodes = [node for node in list(crashed_node_id.values()) if node]
-
                 is_successfully_replaced, replaced_application_chain = replace_application(
                     application_obj,
                     start_function,
@@ -677,6 +699,10 @@ def simulation(
                         for dependent_function in replaced_application_chain[function]:
                             if dependent_function not in application_obj.chain[function]:
                                 application_obj.chain[function].append(dependent_function)
+                    
+                    # application replaced - update infastructure.pl
+                    logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+                    dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
                 else:
                     application_obj.state = ApplicationState.CANCELED
@@ -691,13 +717,6 @@ def simulation(
                     'load' : load,
                 }
                 node_stats[node.id][step_number] = node_data
-
-        # recalculate all paths between nodes of the physical infrastructure
-        if type(infrastructure) is PhysicalInfrastructure:
-            infrastructure.recalculate_routes()
-
-        # update infastructure.pl
-        dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # make 1 step of simulation
         yield env.timeout(1)
