@@ -14,10 +14,13 @@ class PhysicalInfrastructure(Infrastructure) :
 
 
     def recalculate_routes(self) :
-        filtered_nodes = [node for node, node_data in self.graph.nodes(data=True)
-                   if node_data['available'] == True]
+        # instance a copy of the original graph
+        resulting_graph : nx.Graph = self.original_graph.copy()
         
-        resulting_graph : nx.Graph = self.original_graph.subgraph(filtered_nodes)
-        #print(resulting_graph)
+        # remove crashed nodes
+        resulting_graph.remove_nodes_from(self.crashed_nodes)
+        # remove crashed direct links
+        resulting_graph.remove_edges_from(self.crashed_links)
 
+        # recalculate latencies
         self.latencies = dict(nx.all_pairs_dijkstra_path_length(resulting_graph))
