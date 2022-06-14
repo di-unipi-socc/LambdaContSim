@@ -4,11 +4,19 @@ from infrastructure.event_generator import EventGenerator
 from infrastructure.service import Service
 import networkx as nx
 import random
+from enum import IntEnum
+
+# netoworkx return a dictionary like links[node1][LinkInfo][node2]
+# where if LinkInfo is 0 we access to latency value between node1 and node2
+# if LinkInfo is 1 we access to path between node1 and node2
+class LinkInfo(IntEnum):
+    LATENCY = 0
+    PATH = 1
 
 class Infrastructure(ABC):
     nodes : dict[str, Node]
     graph : nx.Graph
-    latencies : dict[str, dict[str, int]]
+    links : dict[str, dict[LinkInfo, dict[str, (int | list)]]]
     event_generators : list[EventGenerator]
     services : list[Service]
 

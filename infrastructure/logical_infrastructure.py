@@ -10,10 +10,10 @@ import random
 
 class LogicalInfrastructure(Infrastructure) :
 
-    def __init__(self, nodes, graph, latencies, event_generators, services):
+    def __init__(self, nodes, graph, links, event_generators, services):
         self.nodes = nodes
         self.graph = graph
-        self.latencies = latencies
+        self.links = links
         self.event_generators = event_generators
         self.services = services
     
@@ -132,13 +132,13 @@ class LogicalInfrastructure(Infrastructure) :
             graph.add_weighted_edges_from(edges)
 
             # find shortest path lengths between nodes
-            network_latencies = dict(nx.all_pairs_dijkstra_path_length(graph))
+            links = dict(nx.all_pairs_dijkstra(graph))
 
             # instance logical infrastructure
             infrastructure = LogicalInfrastructure(
                 nodes = nodes,
                 graph = graph,
-                latencies = network_latencies,
+                links = links,
                 event_generators = event_generators,
                 services = services
             )

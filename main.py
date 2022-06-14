@@ -6,7 +6,7 @@ from application.application import Application, ApplicationState
 from application.placed_function import FunctionState, PlacedFunction
 from config import parse_config
 from generate_infrastructure import generate_infrastructure
-from infrastructure.infrastructure import Infrastructure
+from infrastructure.infrastructure import Infrastructure, LinkInfo
 from infrastructure.logical_infrastructure import LogicalInfrastructure
 from infrastructure.node import NodeCategory
 import os
@@ -93,7 +93,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     # latencies
     
     # get latencies informations
-    latencies = infrastructure.latencies
+    links = infrastructure.links
 
     # get nodes as list
     nodes_list : list[str] = list(graph_nodes)
@@ -117,7 +117,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
                 continue
 
             # if there is no possibility to connect node1 and node2, then we don't have the link latency
-            if node2 not in latencies[node1].keys():
+            if node2 not in links[node1][LinkInfo.LATENCY].keys():
                 continue
 
             # logical crashed links are unreachable (latency is infinity)
@@ -126,7 +126,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
                 string = f'latency({node1}, {node2}, inf).'
             else:
                 # physical links still exist because another path has been found
-                string = f'latency({node1}, {node2}, {latencies[node1][node2]}).'
+                string = f'latency({node1}, {node2}, {links[node1][LinkInfo.LATENCY][node2]}).'
             
             lines.append(string)
 
@@ -486,7 +486,7 @@ def simulation(
                             list_of_applications.append(application_obj)
 
                             # application placed - update infastructure.pl
-                            logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+                            logger.info("Application placed - update infrastructure")
                             dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # CRASH/RESURRECTION PHASE
@@ -499,8 +499,11 @@ def simulation(
         first_crashed_node = None
         second_crashed_node = None
         
-        # True iff the infrastructure needs to be dumped
-        infrastructure_needs_update = False
+        # True iff a node or a link crashed
+        crash_occurred = False
+
+        # True iff a node or a link resurrected
+        resurrection_occurred = False
 
         # NODE crash
         for category in ['cloud', 'fog', 'edge']:
@@ -517,8 +520,8 @@ def simulation(
                 if crashed_node_id[category] is not None:
                     logger.info("Node %s crashed", crashed_node_id[category])
 
-                    # infrastructure needs dump
-                    infrastructure_needs_update = True
+                    # a node crashed
+                    crash_occurred = True
                     
                     # add event to the list
                     event = {
@@ -538,8 +541,8 @@ def simulation(
                 if resurrected_node_id is not None:
                     logger.info("Node %s resurrected", resurrected_node_id)
 
-                    # infrastructure needs dump
-                    infrastructure_needs_update = True
+                    # a node resurrected
+                    resurrection_occurred = True
 
                     # add event to the list
                     event = {
@@ -565,8 +568,8 @@ def simulation(
             if first_crashed_node != None and second_crashed_node != None:
                 logger.info("Link %s <-> %s crashed", first_crashed_node, second_crashed_node)
 
-                # infrastructure needs dump
-                infrastructure_needs_update = True
+                # a link crashed
+                crash_occurred = True
 
                 # add event to the list
                 event = {
@@ -591,8 +594,8 @@ def simulation(
             if first_node != None and second_node != None:
                 logger.info("Link %s <-> %s resurrected", first_node, second_node)
 
-                # infrastructure needs dump
-                infrastructure_needs_update = True
+                # a link resurrected
+                resurrection_occurred = True
 
                 # add event to the list
                 event = {
@@ -602,14 +605,22 @@ def simulation(
                     'epoch' : step_number
                 }
                 link_events.append(event)
-
-        # if something crashed recalculate all paths between nodes of the physical infrastructure
+        
+        # needs infrastructure.pl to be updated?
+        infrastructure_needs_update = crash_occurred or resurrection_occurred
         if infrastructure_needs_update:
+
             if type(infrastructure) is PhysicalInfrastructure:
-                infrastructure.recalculate_routes()
+
+                # if something resurrected recalculate all paths between nodes of the physical infrastructure
+                if resurrection_occurred:
+                    infrastructure.recalculate_routes_after_resurrection()
+                else:
+                    # if something crashed recalculate only necessary paths (those which are involved by node/link crash)
+                    infrastructure.recalculate_routes_after_crash(crashed_nodes, crashed_link)
             
-            # nodes or links crashed - update infastructure.pl
-            logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+            # nodes or links crashed/resurrected - update infastructure.pl
+            logger.info("Infrastructure changes - update infrastructure")
             dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # there are affected applications?
@@ -701,7 +712,7 @@ def simulation(
                                 application_obj.chain[function].append(dependent_function)
                     
                     # application replaced - update infastructure.pl
-                    logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+                    logger.info("Application replaced - update infrastructure")
                     dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
                 else:
