@@ -116,6 +116,10 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
             if node2 in crashed_nodes:
                 continue
 
+            # if there is no possibility to connect node1 and node2, then we don't have the link latency
+            if node2 not in latencies[node1].keys():
+                continue
+
             # logical crashed links are unreachable (latency is infinity)
             if (type(infrastructure) is LogicalInfrastructure 
                 and ((node1, node2) in crashed_links or (node2, node1) in crashed_links)):
@@ -427,6 +431,10 @@ def simulation(
         # for each event generator
         for event_generator in infrastructure.event_generators:
 
+            # the event generator can't be triggered if it is inside a crashed node
+            if event_generator.source_node in infrastructure.crashed_nodes:
+                continue
+
             # generator is triggering?
             generator_triggered = take_decision(config.event_generator_trigger_probability)
 
@@ -649,6 +657,7 @@ def simulation(
                 application_path = os.path.join(g.applications_path, application_obj.filename)
                 shutil.copy(application_path, g.secfaas2fog_application_path)
 
+                # clean crashed nodes dict deleting null references and trasform it into a list
                 crashed_nodes = [node for node in list(crashed_node_id.values()) if node]
 
                 is_successfully_replaced, replaced_application_chain = replace_application(
