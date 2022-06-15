@@ -1,3 +1,4 @@
+from math import inf
 import sys
 from datetime import datetime
 from swiplserver import PrologError, PrologMQI
@@ -6,7 +7,7 @@ from application.application import Application, ApplicationState
 from application.placed_function import FunctionState, PlacedFunction
 from config import parse_config
 from generate_infrastructure import generate_infrastructure
-from infrastructure.infrastructure import Infrastructure
+from infrastructure.infrastructure import Infrastructure, LinkInfo
 from infrastructure.logical_infrastructure import LogicalInfrastructure
 from infrastructure.node import NodeCategory
 import os
@@ -93,7 +94,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
     # latencies
     
     # get latencies informations
-    latencies = infrastructure.latencies
+    links = infrastructure.links
 
     # get nodes as list
     nodes_list : list[str] = list(graph_nodes)
@@ -116,8 +117,8 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
             if node2 in crashed_nodes:
                 continue
 
-            # if there is no possibility to connect node1 and node2, then we don't have the link latency
-            if node2 not in latencies[node1].keys():
+            # if there is no possibility to connect node1 and node2 latency is inf
+            if links[node1][LinkInfo.LATENCY][node2] is inf:
                 continue
 
             # logical crashed links are unreachable (latency is infinity)
@@ -126,7 +127,7 @@ def dump_infrastructure(infrastructure : Infrastructure, output_filename: str):
                 string = f'latency({node1}, {node2}, inf).'
             else:
                 # physical links still exist because another path has been found
-                string = f'latency({node1}, {node2}, {latencies[node1][node2]}).'
+                string = f'latency({node1}, {node2}, {links[node1][LinkInfo.LATENCY][node2]}).'
             
             lines.append(string)
 
@@ -486,7 +487,7 @@ def simulation(
                             list_of_applications.append(application_obj)
 
                             # application placed - update infastructure.pl
-                            logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+                            logger.info("Application placed - update infrastructure")
                             dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # CRASH/RESURRECTION PHASE
@@ -494,31 +495,37 @@ def simulation(
         # reset variables
         crashed_node_id = {}
         resurrected_node_id = {}
-        first_node = None
-        second_node = None
-        first_crashed_node = None
-        second_crashed_node = None
+        crashed_link : tuple = None
+        resurrected_link : tuple = None
+        link_resurr_first_node = None
+        link_resurr_second_node = None
+        link_crashed_first_node = None
+        link_crashed_second_node = None
         
-        # True iff the infrastructure needs to be dumped
-        infrastructure_needs_update = False
+        # True iff a node or a link crashed
+        crash_occurred = False
+
+        # True iff a node or a link resurrected
+        resurrection_occurred = False
 
         # NODE crash
         for category in ['cloud', 'fog', 'edge']:
             
-            node_crashed = take_decision(config.infr_node_crash_probability[category])
+            node_could_crash = take_decision(config.infr_node_crash_probability[category])
 
-            node_resurrected = take_decision(config.infr_node_resurrection_probability[category])
+            node_could_resurrect = take_decision(config.infr_node_resurrection_probability[category])
 
             crashed_node_id[category] = None
+            resurrected_node_id[category] = None
 
-            if node_crashed:
+            if node_could_crash:
                 crashed_node_id[category] = infrastructure.simulate_node_crash(NodeCategory.from_string(category))
                 
                 if crashed_node_id[category] is not None:
                     logger.info("Node %s crashed", crashed_node_id[category])
 
-                    # infrastructure needs dump
-                    infrastructure_needs_update = True
+                    # a node crashed
+                    crash_occurred = True
                     
                     # add event to the list
                     event = {
@@ -528,88 +535,98 @@ def simulation(
                     }
                     node_events.append(event)
             
-            if node_resurrected:
+            if node_could_resurrect:
                 if crashed_node_id[category] is not None:
                     # node which just crashed can't resurrect in the same epoch
-                    resurrected_node_id = infrastructure.simulate_node_resurrection(NodeCategory.from_string(category), crashed_node_id[category])
+                    resurrected_node_id[category] = infrastructure.simulate_node_resurrection(NodeCategory.from_string(category), crashed_node_id[category])
                 else:
-                    resurrected_node_id = infrastructure.simulate_node_resurrection(NodeCategory.from_string(category))
+                    resurrected_node_id[category] = infrastructure.simulate_node_resurrection(NodeCategory.from_string(category))
                 
-                if resurrected_node_id is not None:
-                    logger.info("Node %s resurrected", resurrected_node_id)
+                if resurrected_node_id[category] is not None:
+                    logger.info("Node %s resurrected", resurrected_node_id[category])
 
-                    # infrastructure needs dump
-                    infrastructure_needs_update = True
+                    # a node resurrected
+                    resurrection_occurred = True
 
                     # add event to the list
                     event = {
                         'type' : 'resurrection',
-                        'node_id' : resurrected_node_id,
+                        'node_id' : resurrected_node_id[category],
                         'epoch' : step_number
                     }
                     node_events.append(event)
 
         # clean crashed nodes dict deleting Null references and trasform it into a list
         crashed_nodes = [node for node in list(crashed_node_id.values()) if node]
+        # clean resurrected nodes dict deleting Null references and trasform it into a list
+        resurrected_nodes = [node for node in list(resurrected_node_id.values()) if node]
 
         # LINK crash
-        link_crashed = take_decision(config.infr_link_crash_probability)
+        link_could_crash = take_decision(config.infr_link_crash_probability)
 
-        link_resurrected = take_decision(config.infr_link_resurrection_probability)
+        link_could_resurrect = take_decision(config.infr_link_resurrection_probability)
 
-        crashed_link = []
-
-        if link_crashed:
-            first_crashed_node, second_crashed_node = infrastructure.simulate_link_crash()
+        if link_could_crash:
+            link_crashed_first_node, link_crashed_second_node = infrastructure.simulate_link_crash()
             
-            if first_crashed_node != None and second_crashed_node != None:
-                logger.info("Link %s <-> %s crashed", first_crashed_node, second_crashed_node)
+            if link_crashed_first_node != None and link_crashed_second_node != None:
+                logger.info("Link %s <-> %s crashed", link_crashed_first_node, link_crashed_second_node)
 
-                # infrastructure needs dump
-                infrastructure_needs_update = True
+                # a link crashed
+                crash_occurred = True
 
                 # add event to the list
                 event = {
                     'type' : 'crash',
-                    'first_node_id' : first_crashed_node,
-                    'second_node_id' : second_crashed_node,
+                    'first_node_id' : link_crashed_first_node,
+                    'second_node_id' : link_crashed_second_node,
                     'epoch' : step_number
                 }
                 link_events.append(event)
 
-                crashed_link = [first_crashed_node, second_crashed_node]
+                crashed_link = (link_crashed_first_node, link_crashed_second_node)
         
-        if link_resurrected:
+        if link_could_resurrect:
 
-            if first_crashed_node is not None and second_crashed_node is not None:
-                link_to_exclude = (first_crashed_node, second_crashed_node)
+            if crashed_link is not None:
                 # link which just crashed can't resurrect in the same epoch
-                first_node, second_node = infrastructure.simulate_link_resurrection(link_to_exclude)
+                link_resurr_first_node, link_resurr_second_node = infrastructure.simulate_link_resurrection(crashed_link)
             else:
-                first_node, second_node = infrastructure.simulate_link_resurrection()
+                link_resurr_first_node, link_resurr_second_node = infrastructure.simulate_link_resurrection()
 
-            if first_node != None and second_node != None:
-                logger.info("Link %s <-> %s resurrected", first_node, second_node)
+            if link_resurr_first_node != None and link_resurr_second_node != None:
+                logger.info("Link %s <-> %s resurrected", link_resurr_first_node, link_resurr_second_node)
 
-                # infrastructure needs dump
-                infrastructure_needs_update = True
+                # a link resurrected
+                resurrection_occurred = True
 
                 # add event to the list
                 event = {
                     'type' : 'resurrection',
-                    'first_node_id' : first_node,
-                    'second_node_id' : second_node,
+                    'first_node_id' : link_resurr_first_node,
+                    'second_node_id' : link_resurr_second_node,
                     'epoch' : step_number
                 }
                 link_events.append(event)
 
-        # if something crashed recalculate all paths between nodes of the physical infrastructure
+                resurrected_link = (link_resurr_first_node, link_resurr_second_node)
+        
+        # needs infrastructure.pl to be updated?
+        infrastructure_needs_update = crash_occurred or resurrection_occurred
         if infrastructure_needs_update:
+
             if type(infrastructure) is PhysicalInfrastructure:
-                infrastructure.recalculate_routes()
+
+                # if something resurrected recalculate links which had been affected by past crashes
+                if resurrection_occurred:
+                    infrastructure.recalculate_routes_after_resurrection(resurrected_nodes, resurrected_link)
+                
+                # if something crashed recalculate only necessary paths (those which are involved by node/link crash)
+                if crash_occurred:
+                    infrastructure.recalculate_routes_after_crash(crashed_nodes, crashed_link)
             
-            # nodes or links crashed - update infastructure.pl
-            logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+            # nodes or links crashed/resurrected - update infastructure.pl
+            logger.info("Infrastructure changes - update infrastructure")
             dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         # there are affected applications?
@@ -629,7 +646,7 @@ def simulation(
                 # check if there is at least one function deployed in the crashed nodes
                 # check only waiting and running functions
 
-                if node_crashed:
+                if crashed_nodes:
                 
                     if placed_function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
                         if placed_function.node_id in crashed_nodes:
@@ -646,14 +663,14 @@ def simulation(
                 # where function2 is dependent on function1
                 # check if the link (node1, node2) belongs to the path from nodeX to nodeY
 
-                if link_crashed:
+                if crashed_link:
                 
                     if placed_function.state == FunctionState.WAITING:
                         node_y = placed_function.node_id
                         previous_nodes = placed_function.previous_nodes
                         for node_x in previous_nodes:
-                            path = nx.dijkstra_path(infrastructure.graph, node_x, node_y)
-                            if is_edge_part(path, first_crashed_node, second_crashed_node):
+                            path = infrastructure.links[node_x][LinkInfo.PATH][node_y]
+                            if is_edge_part(path, link_crashed_first_node, link_crashed_second_node):
                                 interested_functions.add(placed_function.id)
         
             if len(interested_functions) > 0:
@@ -687,7 +704,7 @@ def simulation(
                     start_function,
                     starting_nodes,
                     crashed_nodes,
-                    crashed_link,
+                    list(crashed_link) if crashed_link else [],
                     infrastructure,
                     step_number
                 )
@@ -701,7 +718,7 @@ def simulation(
                                 application_obj.chain[function].append(dependent_function)
                     
                     # application replaced - update infastructure.pl
-                    logger.info(f"Dump updated infrastructure into {g.secfaas2fog_infrastructure_path}")
+                    logger.info("Application replaced - update infrastructure")
                     dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
                 else:

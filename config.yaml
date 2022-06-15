@@ -1,7 +1,7 @@
 simulator:
   output_file_prefix : 'report'
   silent_mode : true
-  epochs : 100
+  epochs : 1000
   function_duration : 1
   seed : 100 # if seed is -1 then ignore it
   use_padding : true
@@ -15,7 +15,7 @@ events:
 infrastructure:
   type: physical # allowed values are 'logical' and 'physical'
   filename: simple_infrastructure.pl
-  is_dynamic: true # iff the infrastructure is dynamic, nodes and links can crash
+  is_dynamic: true # nodes and links can crash iff the infrastructure is dynamic
   crash_probability :
     cloud : 0.001
     fog : 0.05

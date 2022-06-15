@@ -169,9 +169,7 @@ def generate_infrastructure():
     
     # find shortest path lengths between nodes
     
-    network_latencies = dict(nx.all_pairs_dijkstra_path_length(graph))
-    
-    graph_nodes : list[str] = list(graph)
+    network_links = dict(nx.all_pairs_dijkstra(graph))
 
     # event generators
     
@@ -265,7 +263,7 @@ def generate_infrastructure():
         for node in nodes_by_cat:
             nodes_dict[node.id] = node
 
-    infrastructure = PhysicalInfrastructure(nodes_dict, graph, network_latencies, event_generators, services)
+    infrastructure = PhysicalInfrastructure(nodes_dict, graph, network_links, event_generators, services)
 
     return infrastructure
 
