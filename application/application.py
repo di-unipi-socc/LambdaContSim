@@ -11,6 +11,9 @@ class ApplicationState(IntEnum):
     COMPLETED = 2
     CANCELED = 3
 
+    def __str__(self):
+        return self.name
+
 
 class Application:
 
@@ -22,6 +25,7 @@ class Application:
     filename: str
     orchestration_id: str
     state: ApplicationState
+    placement_epoch: int
     original_chain: dict[str, list]
     chain: dict[str, list]
     placement: dict[str, PlacedFunction]
@@ -33,6 +37,7 @@ class Application:
         app_name: str,
         filename: str,
         orchestration_id: str,
+        placement_epoch: int,
         chain: dict,
         placement: dict,
         infrastructure: dict,
@@ -42,6 +47,7 @@ class Application:
         self.filename = filename
         self.orchestration_id = orchestration_id
         self.state = ApplicationState.PLACED
+        self.placement_epoch = placement_epoch
         self.original_chain = copy.deepcopy(chain)
         self.chain = copy.deepcopy(chain)
         self.placement = placement

@@ -15,6 +15,7 @@ import shutil
 import config
 from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from orchestration.orchestrator import Orchestrator
+from orchestration.function_process import FunctionProcess
 import logs
 import logging
 from placement import (
@@ -25,7 +26,7 @@ from placement import (
 )
 import simpy
 import global_variables as g
-from utils import get_recursive_dependents, is_edge_part, take_decision, get_oldest
+from utils import get_ready_functions, get_recursive_dependents, is_edge_part, take_decision, get_oldest
 import random
 
 # Statistical variables
@@ -317,6 +318,7 @@ def place_application(
             application_name,
             config_application["filename"],
             config_application["orchestration_id"],
+            epoch,
             application_chain,
             placement,
             infrastructure.nodes,
@@ -453,77 +455,6 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
         # print the step
         logger.info("--- STEP %d ---", step_number)
-
-        # PLACEMENT PHASE
-
-        # for each event generator
-        for event_generator in infrastructure.event_generators:
-
-            # the event generator can't be triggered if it is inside a crashed node
-            if event_generator.source_node in infrastructure.crashed_nodes:
-                continue
-
-            # generator is triggering?
-            generator_triggered = take_decision(
-                config.event_generator_trigger_probability
-            )
-
-            if generator_triggered:
-                logger.info(f"Generator {event_generator.generator_id} triggered")
-
-                # get the list of triggered events
-                triggered_events = []
-                for event, event_probability in event_generator.events:
-
-                    # event of that generator is triggering?
-                    event_triggered = take_decision(event_probability)
-
-                    if event_triggered:
-                        triggered_events.append(event)
-
-                # for each application, check if it is triggered by one of these events
-                for application_name in config.applications:
-
-                    config_application = config.applications[application_name]
-
-                    if config_application["trigger_event"] in triggered_events:
-
-                        # try to place the application
-                        logger.info(
-                            f"Event {config_application['trigger_event']} ({event_generator.generator_id}) triggered {application_name}"
-                        )
-
-                        # get application path
-                        application_filename = config_application["filename"]
-                        application_path = os.path.join(
-                            g.applications_path, application_filename
-                        )
-
-                        # save application file into default path
-                        shutil.copy(application_path, g.secfaas2fog_application_path)
-
-                        # place
-                        application_obj = place_application(
-                            application_name,
-                            config_application,
-                            event_generator.generator_id,
-                            infrastructure,
-                            step_number,
-                        )
-
-                        if application_obj is not None:
-                            # launch application
-                            thread = Orchestrator(env=env, application=application_obj)
-                            thread.start()
-
-                            # add application into a list
-                            list_of_applications.append(application_obj)
-
-                            # application placed - update infastructure.pl
-                            logger.info("Application placed - update infrastructure")
-                            dump_infrastructure(
-                                infrastructure, g.secfaas2fog_infrastructure_path
-                            )
 
         # CRASH/RESURRECTION PHASE
 
@@ -707,134 +638,257 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
             logger.info("Infrastructure changes - update infrastructure")
             dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
-        # there are affected applications?
-        for application_obj in list_of_applications:
+        # somehing crashed?
+        if crash_occurred:
+            # there are affected applications?
+            for application_obj in list_of_applications:
 
-            # completed or canceled apps are not interesting
-            if application_obj.state in [
-                ApplicationState.COMPLETED,
-                ApplicationState.CANCELED,
-            ]:
-                continue
+                # completed or canceled apps are not interesting
+                if application_obj.state in [
+                    ApplicationState.COMPLETED,
+                    ApplicationState.CANCELED,
+                ]:
+                    continue
 
-            # list of functions interested by the crash
-            interested_functions = set()
+                # list of functions interested by the crash
+                interested_functions = set()
 
-            for function_name in application_obj.placement:
-                placed_function: PlacedFunction = application_obj.placement[
-                    function_name
-                ]
+                # find functions interested by the crash
+                for placed_function in application_obj.placement.values():
 
-                # NODE crash
-                # check if there is at least one function deployed in the crashed nodes
-                # check only waiting and running functions
+                    # NODE crash
+                    # check if there is at least one function deployed in the crashed nodes
+                    # check only waiting and running functions
 
-                if crashed_nodes:
+                    if crashed_nodes:
 
-                    if placed_function.state in [
-                        FunctionState.WAITING,
-                        FunctionState.RUNNING,
-                    ]:
-                        if placed_function.node_id in crashed_nodes:
-                            interested_functions.add(placed_function.id)
-
-                            # interrupt the function if it is running
-                            if placed_function.state == FunctionState.RUNNING:
-
-                                application_obj.function_processes[
-                                    placed_function.id
-                                ].action.interrupt()
-
-                # LINK crash
-                # if there is a waiting function2 deployed on nodeY
-                # for any function1 deployed on nodeX
-                # where function2 is dependent on function1
-                # check if the link (node1, node2) belongs to the path from nodeX to nodeY
-
-                if crashed_link:
-
-                    if placed_function.state == FunctionState.WAITING:
-                        node_y = placed_function.node_id
-                        previous_nodes = placed_function.previous_nodes
-                        for node_x in previous_nodes:
-                            path = infrastructure.links[node_x][LinkInfo.PATH][node_y]
-                            if is_edge_part(
-                                path, link_crashed_first_node, link_crashed_second_node
-                            ):
+                        if placed_function.state in [
+                            FunctionState.WAITING,
+                            FunctionState.RUNNING,
+                        ]:
+                            if placed_function.node_id in crashed_nodes:
                                 interested_functions.add(placed_function.id)
 
-            if len(interested_functions) > 0:
-                logger.info("Application %s needs a replacement", application_obj.id)
+                    # LINK crash
+                    # if there is a waiting function2 deployed on nodeY
+                    # for any function1 deployed on nodeX
+                    # where function2 is dependent on function1
+                    # check if the link (node1, node2) belongs to the path from nodeX to nodeY
 
-                # find the oldest relative among them
-                start_function = get_oldest(
-                    list(interested_functions), application_obj.original_chain
-                )
+                    if crashed_link:
 
-                dependents_functions = get_recursive_dependents(
-                    start_function, application_obj.chain
-                )
+                        if placed_function.state == FunctionState.WAITING:
+                            node_y = placed_function.node_id
+                            previous_nodes = placed_function.previous_nodes
+                            for node_x in previous_nodes:
+                                path = infrastructure.links[node_x][LinkInfo.PATH][node_y]
+                                if is_edge_part(
+                                    path, link_crashed_first_node, link_crashed_second_node
+                                ):
+                                    interested_functions.add(placed_function.id)
 
-                starting_nodes = application_obj.placement[
-                    start_function
-                ].previous_nodes
+                # if there is interested functions then application needs to be partially replaced
+                if interested_functions:
+                    logger.info("Application %s needs a partial replacement", application_obj.id)
 
-                # release all resources of dependents functions
-                for function_name in dependents_functions:
-                    function = application_obj.placement[function_name]
-                    node_id = function.node_id
-                    node_obj = application_obj.infrastructure_nodes[node_id]
-                    node_obj.release_resources(function.memory, function.v_cpu)
-
-                    logger.info(
-                        "Application %s - Function %s has been canceled",
-                        application_obj.id,
-                        function.id,
+                    # find the oldest relative among them
+                    start_function = get_oldest(
+                        list(interested_functions), application_obj.original_chain
                     )
-                    function.state = FunctionState.CANCELED
 
-                # search for a new placement
+                    # get the list of function which depends by start_function
+                    dependents_functions = get_recursive_dependents(
+                        start_function, application_obj.chain
+                    )
 
-                # save application file into default path
-                application_path = os.path.join(
-                    g.applications_path, application_obj.filename
-                )
-                shutil.copy(application_path, g.secfaas2fog_application_path)
+                    functions_to_be_released = [start_function] + dependents_functions
 
-                (
-                    is_successfully_replaced,
-                    replaced_application_chain,
-                ) = replace_application(
-                    application_obj,
-                    start_function,
-                    starting_nodes,
-                    crashed_nodes,
-                    list(crashed_link) if crashed_link else [],
-                    infrastructure,
-                    step_number,
-                )
+                    # release all resources of start function and its dependents
+                    for function_name in functions_to_be_released:
+                        function = application_obj.placement[function_name]
+                        node_id = function.node_id
+                        node_obj = application_obj.infrastructure_nodes[node_id]
+                        node_obj.release_resources(function.memory, function.v_cpu)
 
-                if is_successfully_replaced:
-                    # update the application chain with the new placement
-                    functions = replaced_application_chain.keys()
-                    for function in functions:
-                        for dependent_function in replaced_application_chain[function]:
-                            if (
-                                dependent_function
-                                not in application_obj.chain[function]
-                            ):
-                                application_obj.chain[function].append(
+                        logger.info(
+                            "Application %s - Function %s has been canceled",
+                            application_obj.id,
+                            function.id,
+                        )
+
+                        # interrupt the function if it is running
+                        if function.state == FunctionState.RUNNING:
+
+                            # set function as interrupted
+                            function.state = FunctionState.INTERRUPTED
+
+                            application_obj.function_processes[
+                                function.id
+                            ].action.interrupt()
+                        
+                        else:
+                            # set function state as canceled
+                            function.state = FunctionState.CANCELED
+
+                    # get starting nodes for replacement
+                    starting_nodes = application_obj.placement[
+                        start_function
+                    ].previous_nodes
+
+                    # search for a new placement
+
+                    # save application file into default path
+                    application_path = os.path.join(
+                        g.applications_path, application_obj.filename
+                    )
+                    shutil.copy(application_path, g.secfaas2fog_application_path)
+
+                    (
+                        is_successfully_replaced,
+                        replaced_application_chain,
+                    ) = replace_application(
+                        application_obj,
+                        start_function,
+                        starting_nodes,
+                        crashed_nodes,
+                        list(crashed_link) if crashed_link else [],
+                        infrastructure,
+                        step_number,
+                    )
+
+                    if is_successfully_replaced:
+                        # update the application chain with the new placement
+                        functions = replaced_application_chain.keys()
+                        for function in functions:
+                            for dependent_function in replaced_application_chain[function]:
+                                if (
                                     dependent_function
+                                    not in application_obj.chain[function]
+                                ):
+                                    application_obj.chain[function].append(
+                                        dependent_function
+                                    )
+                        
+                        # start the replaced section of the application
+                        # if it is the right moment (previus functions in the chain finished)
+                        ready_replaced_functions = get_ready_functions(replaced_application_chain)
+                        ready_functions = get_ready_functions(application_obj.chain)
+                        # execute ready functions
+                        for function_name in ready_replaced_functions:
+                            if function_name in ready_functions:
+                                fun_process = FunctionProcess(
+                                    application_obj.placement[function_name], env, application_obj
+                                )
+                                application_obj.function_processes[function_name] = fun_process
+
+                        # application replaced - update infastructure.pl
+                        logger.info("Application replaced - update infrastructure")
+                        dump_infrastructure(
+                            infrastructure, g.secfaas2fog_infrastructure_path
+                        )
+
+                    else:
+                        # set application state as canceled
+                        application_obj.state = ApplicationState.CANCELED
+                        
+                        # release resources of waiting and running functions which were not involved by the crash
+                        for function_name in application_obj.placement:
+                            function = application_obj.placement[function_name]
+                            if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
+                                node_id = function.node_id
+                                node_obj = application_obj.infrastructure_nodes[node_id]
+                                node_obj.release_resources(function.memory, function.v_cpu)
+
+                                logger.info(
+                                    "Application %s - Function %s has been canceled after failed replacement",
+                                    application_obj.id,
+                                    function.id,
                                 )
 
-                    # application replaced - update infastructure.pl
-                    logger.info("Application replaced - update infrastructure")
-                    dump_infrastructure(
-                        infrastructure, g.secfaas2fog_infrastructure_path
-                    )
+                                # interrupt the function if it is running
+                                if function.state == FunctionState.RUNNING:
 
-                else:
-                    application_obj.state = ApplicationState.CANCELED
+                                    # set function as interrupted
+                                    function.state = FunctionState.INTERRUPTED
+
+                                    application_obj.function_processes[
+                                        function.id
+                                    ].action.interrupt()
+                                
+                                else:
+                                    # set function state as canceled
+                                    function.state = FunctionState.CANCELED
+
+        # PLACEMENT PHASE
+
+        # for each event generator
+        for event_generator in infrastructure.event_generators:
+
+            # the event generator can't be triggered if it is inside a crashed node
+            if event_generator.source_node in infrastructure.crashed_nodes:
+                continue
+
+            # generator is triggering?
+            generator_triggered = take_decision(
+                config.event_generator_trigger_probability
+            )
+
+            if generator_triggered:
+                logger.info(f"Generator {event_generator.generator_id} triggered")
+
+                # get the list of triggered events
+                triggered_events = []
+                for event, event_probability in event_generator.events:
+
+                    # event of that generator is triggering?
+                    event_triggered = take_decision(event_probability)
+
+                    if event_triggered:
+                        triggered_events.append(event)
+
+                # for each application, check if it is triggered by one of these events
+                for application_name in config.applications:
+
+                    config_application = config.applications[application_name]
+
+                    if config_application["trigger_event"] in triggered_events:
+
+                        # try to place the application
+                        logger.info(
+                            f"Event {config_application['trigger_event']} ({event_generator.generator_id}) triggered {application_name}"
+                        )
+
+                        # get application path
+                        application_filename = config_application["filename"]
+                        application_path = os.path.join(
+                            g.applications_path, application_filename
+                        )
+
+                        # save application file into default path
+                        shutil.copy(application_path, g.secfaas2fog_application_path)
+
+                        # place
+                        application_obj = place_application(
+                            application_name,
+                            config_application,
+                            event_generator.generator_id,
+                            infrastructure,
+                            step_number,
+                        )
+
+                        if application_obj is not None:
+                            # launch application
+                            thread = Orchestrator(env=env, application=application_obj)
+                            thread.start()
+
+                            # add application into the list
+                            list_of_applications.append(application_obj)
+
+                            # application placed - update infastructure.pl
+                            logger.info("Application placed - update infrastructure")
+                            dump_infrastructure(
+                                infrastructure, g.secfaas2fog_infrastructure_path
+                            )
 
         # get nodes statistics
         for node in infrastructure.nodes.values():

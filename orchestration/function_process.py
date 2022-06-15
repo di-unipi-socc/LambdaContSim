@@ -42,25 +42,12 @@ class FunctionProcess:
             yield self.env.timeout(config.sim_function_duration)
 
         except simpy.Interrupt:
-            # function interrupted - probably there is a crash
+            # function interrupted by a crash
 
             logger.info(
                 "Application %s - Function %s has been interrupted",
                 self.application.id,
                 self.fun.id,
-            )
-
-            # function has been canceled
-            self.fun.state = FunctionState.CANCELED
-
-            # release resources
-
-            fun_name = self.fun.id
-            node_id = self.application.placement[fun_name].node_id
-            node: Node = self.application.infrastructure_nodes[node_id]
-            node.release_resources(
-                self.application.placement[fun_name].memory,
-                self.application.placement[fun_name].v_cpu,
             )
 
             return
@@ -127,7 +114,7 @@ class FunctionProcess:
             )
             # release resources
             for fun in deleted_functions:
-                self.application.placement[fun].state = FunctionState.CANCELED
+                self.application.placement[fun].state = FunctionState.BRANCH_NOT_TAKEN
                 node_id = self.application.placement[fun].node_id
                 node: Node = self.application.infrastructure_nodes[node_id]
                 node.release_resources(

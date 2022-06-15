@@ -1,13 +1,18 @@
-from enum import Enum
+from enum import IntEnum
 
 # class which design a single function of an application
 
 # Possible states of a function
-class FunctionState(Enum):
-    WAITING = 0
-    RUNNING = 1
-    COMPLETED = 2
-    CANCELED = 3
+class FunctionState(IntEnum):
+    WAITING = 0             # function is waiting to be executed
+    RUNNING = 1             # function is running
+    COMPLETED = 2           # function finished its execution
+    CANCELED = 3            # function has been canceled
+    BRANCH_NOT_TAKEN = 4    # function has been canceled because it was part of a discarded if branch
+    INTERRUPTED = 5         # function has been interrupted
+
+    def __str__(self):
+        return self.name
 
 
 class PlacedFunction:
