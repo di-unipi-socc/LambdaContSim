@@ -35,9 +35,9 @@ class LogicalInfrastructure(Infrastructure) :
         event_pattern = r'^eventGenerator\(([^,]+),(\[.*?\]),([^,]+)\)\.*'
         service_pattern = r'^service\(([^,]+),([^,]+),([^,]+),([^,]+)\)\.*'
 
-        with open(infrastructure_filename, 'r') as f:
+        with open(infrastructure_filename, 'r') as file:
             
-            lines = f.readlines()
+            lines = file.readlines()
 
             for line in lines:
                 if line.startswith('node'):
