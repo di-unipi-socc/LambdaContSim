@@ -11,21 +11,30 @@ class FunctionState(Enum):
 
 
 class PlacedFunction:
-    id : str # function unique identifier
-    node_id : str # node where the function has been deployed
+    id: str  # function unique identifier
+    node_id: str  # node where the function has been deployed
     software_requirements: list[str]  # list of software reqs
     # hardware reqs
-    memory : int = 0
-    v_cpu : int = 0
-    mhz : int = 0
+    memory: int = 0
+    v_cpu: int = 0
+    mhz: int = 0
     # is a guard of a conditional state?
-    is_guard : bool = False
+    is_guard: bool = False
     # state of the function
-    state : FunctionState
+    state: FunctionState
     # list of node where are placed the functions which it is depending
-    previous_nodes : list[str]
+    previous_nodes: list[str]
 
-    def __init__(self, function_id: str, node_id : str, sw_reqs: list[str], memory: int, v_cpu: int, mhz: int, is_guard : bool):
+    def __init__(
+        self,
+        function_id: str,
+        node_id: str,
+        sw_reqs: list[str],
+        memory: int,
+        v_cpu: int,
+        mhz: int,
+        is_guard: bool,
+    ):
         self.id = function_id
         self.node_id = node_id
         self.software_requirements = sw_reqs
@@ -33,5 +42,5 @@ class PlacedFunction:
         self.v_cpu = v_cpu
         self.mhz = mhz
         self.is_guard = is_guard
-        self.state =  FunctionState.WAITING
+        self.state = FunctionState.WAITING
         self.previous_nodes = []

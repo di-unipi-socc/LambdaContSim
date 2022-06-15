@@ -11,24 +11,32 @@ class ApplicationState(IntEnum):
     COMPLETED = 2
     CANCELED = 3
 
+
 class Application:
 
     # unique id iterator variable
     id_iterator = itertools.count()
 
-    id : str
-    name : str
-    filename : str
-    orchestration_id : str
-    state : ApplicationState
-    original_chain : dict[str, list]
-    chain : dict[str, list]
-    placement : dict[str, PlacedFunction]
-    infrastructure_nodes : dict
-    function_processes : dict
+    id: str
+    name: str
+    filename: str
+    orchestration_id: str
+    state: ApplicationState
+    original_chain: dict[str, list]
+    chain: dict[str, list]
+    placement: dict[str, PlacedFunction]
+    infrastructure_nodes: dict
+    function_processes: dict
 
-
-    def __init__(self, app_name: str, filename: str, orchestration_id : str, chain: dict, placement : dict, infrastructure : dict):
+    def __init__(
+        self,
+        app_name: str,
+        filename: str,
+        orchestration_id: str,
+        chain: dict,
+        placement: dict,
+        infrastructure: dict,
+    ):
         self.id = app_name + "-" + str(next(Application.id_iterator))
         self.name = app_name
         self.filename = filename
@@ -39,4 +47,3 @@ class Application:
         self.placement = placement
         self.infrastructure_nodes = infrastructure
         self.function_processes = {}
-
