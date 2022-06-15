@@ -495,10 +495,12 @@ def simulation(
         # reset variables
         crashed_node_id = {}
         resurrected_node_id = {}
-        first_resurrected_node = None
-        second_resurrected_node = None
-        first_crashed_node = None
-        second_crashed_node = None
+        crashed_link : tuple = None
+        resurrected_link : tuple = None
+        link_resurr_first_node = None
+        link_resurr_second_node = None
+        link_crashed_first_node = None
+        link_crashed_second_node = None
         
         # True iff a node or a link crashed
         crash_occurred = False
@@ -564,14 +566,11 @@ def simulation(
 
         link_could_resurrect = take_decision(config.infr_link_resurrection_probability)
 
-        crashed_link : tuple = None
-        resurrected_link : tuple = None
-
         if link_could_crash:
-            first_crashed_node, second_crashed_node = infrastructure.simulate_link_crash()
+            link_crashed_first_node, link_crashed_second_node = infrastructure.simulate_link_crash()
             
-            if first_crashed_node != None and second_crashed_node != None:
-                logger.info("Link %s <-> %s crashed", first_crashed_node, second_crashed_node)
+            if link_crashed_first_node != None and link_crashed_second_node != None:
+                logger.info("Link %s <-> %s crashed", link_crashed_first_node, link_crashed_second_node)
 
                 # a link crashed
                 crash_occurred = True
@@ -579,24 +578,24 @@ def simulation(
                 # add event to the list
                 event = {
                     'type' : 'crash',
-                    'first_node_id' : first_crashed_node,
-                    'second_node_id' : second_crashed_node,
+                    'first_node_id' : link_crashed_first_node,
+                    'second_node_id' : link_crashed_second_node,
                     'epoch' : step_number
                 }
                 link_events.append(event)
 
-                crashed_link = (first_crashed_node, second_crashed_node)
+                crashed_link = (link_crashed_first_node, link_crashed_second_node)
         
         if link_could_resurrect:
 
             if crashed_link is not None:
                 # link which just crashed can't resurrect in the same epoch
-                first_resurrected_node, second_resurrected_node = infrastructure.simulate_link_resurrection(crashed_link)
+                link_resurr_first_node, link_resurr_second_node = infrastructure.simulate_link_resurrection(crashed_link)
             else:
-                first_resurrected_node, second_resurrected_node = infrastructure.simulate_link_resurrection()
+                link_resurr_first_node, link_resurr_second_node = infrastructure.simulate_link_resurrection()
 
-            if first_resurrected_node != None and second_resurrected_node != None:
-                logger.info("Link %s <-> %s resurrected", first_resurrected_node, second_resurrected_node)
+            if link_resurr_first_node != None and link_resurr_second_node != None:
+                logger.info("Link %s <-> %s resurrected", link_resurr_first_node, link_resurr_second_node)
 
                 # a link resurrected
                 resurrection_occurred = True
@@ -604,13 +603,13 @@ def simulation(
                 # add event to the list
                 event = {
                     'type' : 'resurrection',
-                    'first_node_id' : first_resurrected_node,
-                    'second_node_id' : second_resurrected_node,
+                    'first_node_id' : link_resurr_first_node,
+                    'second_node_id' : link_resurr_second_node,
                     'epoch' : step_number
                 }
                 link_events.append(event)
 
-                resurrected_link = (first_resurrected_node, second_resurrected_node)
+                resurrected_link = (link_resurr_first_node, link_resurr_second_node)
         
         # needs infrastructure.pl to be updated?
         infrastructure_needs_update = crash_occurred or resurrection_occurred
@@ -671,7 +670,7 @@ def simulation(
                         previous_nodes = placed_function.previous_nodes
                         for node_x in previous_nodes:
                             path = infrastructure.links[node_x][LinkInfo.PATH][node_y]
-                            if is_edge_part(path, first_crashed_node, second_crashed_node):
+                            if is_edge_part(path, link_crashed_first_node, link_crashed_second_node):
                                 interested_functions.add(placed_function.id)
         
             if len(interested_functions) > 0:
