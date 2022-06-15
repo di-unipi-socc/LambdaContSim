@@ -3,7 +3,7 @@ simulator:
   silent_mode : true
   epochs : 1000
   function_duration : 1
-  seed : 100 # if seed is -1 then ignore it
+  seed : 100 # if seed is -1 then a cryptographically strong one will be generated
   use_padding : true
   max_placement_time : 1
 
