@@ -27,7 +27,6 @@ import simpy
 import global_variables as g
 from utils import get_recursive_dependents, is_edge_part, take_decision, get_oldest
 import random
-import networkx as nx
 
 # Statistical variables
 
