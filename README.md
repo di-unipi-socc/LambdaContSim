@@ -1,5 +1,7 @@
 # λ-FogSim (LambdaFogSim)
 
+![example workflow](https://github.com/alessiomatricardi/LambdaFogSim/actions/workflows/pylint.yml/badge.svg)
+
 ## Requirements
 
 In order to execute LambdaFogSim, make sure to have installed `Python 3.10` or above.
