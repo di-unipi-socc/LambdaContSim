@@ -802,8 +802,7 @@ def main(argv):
         logger.setLevel(logging.ERROR)
     
     # Seed for deterministic execution
-    if config.sim_seed != -1:
-        random.seed(config.sim_seed)
+    random.seed(config.sim_seed)
     
     # Instance infrastructure
 
@@ -953,6 +952,7 @@ def main(argv):
     stats_to_dump = {
         'general' : {
             'epochs' : config.sim_num_of_epochs,
+            'seed' : config.sim_seed,
             'global' : {
                 'total_attempts' : tempted_placements['global'],
                 'total_successes' : successes['global'],

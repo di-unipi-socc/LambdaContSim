@@ -51,6 +51,11 @@ def parse_config(path):
         sim_function_duration = int(config['simulator']['function_duration'])
 
         sim_seed = int(config['simulator']['seed'])
+        # if seed is -1, generate a cryptographically strong one
+        if sim_seed == -1:
+            import secrets
+            sim_seed = secrets.randbelow(1_000_000_000)
+        
         sim_use_padding = bool(config['simulator']['use_padding'])
         sim_max_placement_time = int(config['simulator']['max_placement_time'])
 
