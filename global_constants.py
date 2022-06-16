@@ -37,9 +37,7 @@ def init():
     # default Prolog files path
     SECF2F_PLACER_PATH = os.path.join(secfaas2fog_path, "placer.pl")
     SECF2F_APP_PATH = os.path.join(secfaas2fog_path, "application.pl")
-    SECF2F_INFRASTRUCTURE_PATH = os.path.join(
-        secfaas2fog_path, "infrastructure.pl"
-    )
+    SECF2F_INFRASTRUCTURE_PATH = os.path.join(secfaas2fog_path, "infrastructure.pl")
 
     # default infrastructures and applications paths
     INFRASTRUCTURES_PATH = os.path.join(os.curdir, "test_set", "infrastructures")
@@ -49,7 +47,9 @@ def init():
     DEFAULT_CONFIG_PATH = os.path.join(os.curdir, "config.yaml")
 
     # default infrastructure config path
-    DEFAULT_INFRASTRUCTURE_CONFIG_PATH = os.path.join(os.curdir, "infrastructure_config.yaml")
+    DEFAULT_INFRASTRUCTURE_CONFIG_PATH = os.path.join(
+        os.curdir, "infrastructure_config.yaml"
+    )
 
     # where we save the generated infrastructure file
     GENERATED_INFRASTRUCTURE_PATH = os.path.join(

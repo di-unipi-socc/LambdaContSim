@@ -114,7 +114,9 @@ class FunctionProcess:
             )
             # release resources
             for function_name in deleted_functions:
-                self.application.placement[function_name].state = FunctionState.BRANCH_NOT_TAKEN
+                self.application.placement[
+                    function_name
+                ].state = FunctionState.BRANCH_NOT_TAKEN
                 node_id = self.application.placement[function_name].node_id
                 node: Node = self.application.infrastructure_nodes[node_id]
                 node.release_resources(

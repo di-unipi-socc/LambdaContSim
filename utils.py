@@ -24,7 +24,7 @@ def get_direct_dependents(application_chain: dict, function_id: str) -> list[str
 
     to_return = []
     for function_key in application_chain:
-        dependencies : list = application_chain[function_key]
+        dependencies: list = application_chain[function_key]
         if function_id in dependencies:
             to_return.append(function_key)
 
@@ -88,7 +88,7 @@ def get_recursive_dependents(function_id: str, application_chain: dict) -> list:
     return list(set(to_return))
 
 
-def find_functions_level(result: dict, function: str, chain: dict, level:int = 0):
+def find_functions_level(result: dict, function: str, chain: dict, level: int = 0):
     """
     Find for each function in the chain its level of execution
     """

@@ -144,7 +144,9 @@ def parse_config(path):
         # if the infrastructur is logical, we need to take it from a Prolog file
         if infr_type == "logical":
             infr_temp_filename = str(config["infrastructure"]["logical_filename"])
-            infr_logical_filename = os.path.join(gc.INFRASTRUCTURES_PATH, infr_temp_filename)
+            infr_logical_filename = os.path.join(
+                gc.INFRASTRUCTURES_PATH, infr_temp_filename
+            )
 
             if not os.path.isfile(infr_logical_filename):
                 logger.error(

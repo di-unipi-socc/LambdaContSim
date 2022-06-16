@@ -26,7 +26,7 @@ from utils import (
     get_recursive_dependents,
     is_edge_part,
     take_decision,
-    get_oldest
+    get_oldest,
 )
 import random
 
@@ -47,7 +47,9 @@ def print_usage():
     )
     print("\nOptions:")
     print("-c <config file> simulator config (default config.yaml)")
-    print("-i <infrastructure config file> physical infrastructure config (default infrastructure_config.yaml)")
+    print(
+        "-i <infrastructure config file> physical infrastructure config (default infrastructure_config.yaml)"
+    )
 
 
 def place_application(
@@ -500,15 +502,21 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                             node_y = placed_function.node_id
                             previous_nodes = placed_function.previous_nodes
                             for node_x in previous_nodes:
-                                path = infrastructure.links[node_x][LinkInfo.PATH][node_y]
+                                path = infrastructure.links[node_x][LinkInfo.PATH][
+                                    node_y
+                                ]
                                 if is_edge_part(
-                                    path, link_crashed_first_node, link_crashed_second_node
+                                    path,
+                                    link_crashed_first_node,
+                                    link_crashed_second_node,
                                 ):
                                     interested_functions.add(placed_function.id)
 
                 # if there is interested functions then application needs to be partially replaced
                 if interested_functions:
-                    logger.info("Application %s needs a partial replacement", application_obj.id)
+                    logger.info(
+                        "Application %s needs a partial replacement", application_obj.id
+                    )
 
                     # find the oldest relative among them
                     start_function = get_oldest(
@@ -544,7 +552,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                             application_obj.function_processes[
                                 function.id
                             ].action.interrupt()
-                        
+
                         else:
                             # set function state as canceled
                             function.state = FunctionState.CANCELED
@@ -579,7 +587,9 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                         # update the application chain with the new placement
                         functions = replaced_application_chain.keys()
                         for function in functions:
-                            for dependent_function in replaced_application_chain[function]:
+                            for dependent_function in replaced_application_chain[
+                                function
+                            ]:
                                 if (
                                     dependent_function
                                     not in application_obj.chain[function]
@@ -587,18 +597,24 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                     application_obj.chain[function].append(
                                         dependent_function
                                     )
-                        
+
                         # start the replaced section of the application
                         # if it is the right moment (previus functions in the chain finished)
-                        ready_replaced_functions = get_ready_functions(replaced_application_chain)
+                        ready_replaced_functions = get_ready_functions(
+                            replaced_application_chain
+                        )
                         ready_functions = get_ready_functions(application_obj.chain)
                         # execute ready functions
                         for function_name in ready_replaced_functions:
                             if function_name in ready_functions:
                                 fun_process = FunctionProcess(
-                                    application_obj.placement[function_name], env, application_obj
+                                    application_obj.placement[function_name],
+                                    env,
+                                    application_obj,
                                 )
-                                application_obj.function_processes[function_name] = fun_process
+                                application_obj.function_processes[
+                                    function_name
+                                ] = fun_process
 
                         # application replaced - update infastructure.pl
                         logger.info("Application replaced - update infrastructure")
@@ -609,14 +625,19 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                     else:
                         # set application state as canceled
                         application_obj.state = ApplicationState.CANCELED
-                        
+
                         # release resources of waiting and running functions which were not involved by the crash
                         for function_name in application_obj.placement:
                             function = application_obj.placement[function_name]
-                            if function.state in [FunctionState.WAITING, FunctionState.RUNNING]:
+                            if function.state in [
+                                FunctionState.WAITING,
+                                FunctionState.RUNNING,
+                            ]:
                                 node_id = function.node_id
                                 node_obj = application_obj.infrastructure_nodes[node_id]
-                                node_obj.release_resources(function.memory, function.v_cpu)
+                                node_obj.release_resources(
+                                    function.memory, function.v_cpu
+                                )
 
                                 logger.info(
                                     "Application %s - Function %s has been canceled after failed replacement",
@@ -633,7 +654,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                     application_obj.function_processes[
                                         function.id
                                     ].action.interrupt()
-                                
+
                                 else:
                                     # set function state as canceled
                                     function.state = FunctionState.CANCELED
@@ -697,9 +718,11 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
                         if application_obj is not None:
                             # launch application
-                            
+
                             # get first functions to execute from the chain
-                            ready_functions: list = get_ready_functions(application_obj.chain)
+                            ready_functions: list = get_ready_functions(
+                                application_obj.chain
+                            )
 
                             # set application as running
                             application_obj.state = ApplicationState.RUNNING
@@ -707,9 +730,13 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                             # execute ready functions
                             for function_name in ready_functions:
                                 fun_process = FunctionProcess(
-                                    application_obj.placement[function_name], env, application_obj
+                                    application_obj.placement[function_name],
+                                    env,
+                                    application_obj,
                                 )
-                                application_obj.function_processes[function_name] = fun_process
+                                application_obj.function_processes[
+                                    function_name
+                                ] = fun_process
 
                             # add application into the list
                             list_of_applications.append(application_obj)
@@ -759,7 +786,7 @@ def main(argv):
 
     # parse command line arguments
     for i in range(0, len(argv) - 1, 2):
-        option : str = argv[i]
+        option: str = argv[i]
         option_value = argv[i + 1]
 
         if not option.startswith("-"):
@@ -789,22 +816,22 @@ def main(argv):
             )
             print_usage()
             return 1
-    
+
     if infrastructure_given:
         # check if the given infrastructure config path is a file
-        if (
-            not os.path.exists(infrastructure_config_path)
-            or not os.path.isfile(infrastructure_config_path)
+        if not os.path.exists(infrastructure_config_path) or not os.path.isfile(
+            infrastructure_config_path
         ):
             logger.error(
                 f"Infrastructure config path {infrastructure_config_path} not exists or is not a file"
             )
-            logger.info(f"Fallback to default config file {gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH}")
+            logger.info(
+                f"Fallback to default config file {gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH}"
+            )
             infrastructure_config_path = gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH
             # check that the default config exists
-            if (
-                not os.path.exists(infrastructure_config_path)
-                or not os.path.isfile(infrastructure_config_path)
+            if not os.path.exists(infrastructure_config_path) or not os.path.isfile(
+                infrastructure_config_path
             ):
                 logger.critical(
                     f"Default config path {infrastructure_config_path} not exists or is not a file, exit..."
@@ -825,6 +852,7 @@ def main(argv):
     # if silent mode is active don't show info messages but only errors and criticals
     if config.sim_silent_mode:
         import logging
+
         logger.info("Silent mode is now active, only errors will be shown")
         logger.setLevel(logging.ERROR)
 

@@ -21,7 +21,7 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
 
     num_of_nodes = {}
 
-    config : dict
+    config: dict
 
     with open(config_filename, "r") as file:
 
