@@ -1,5 +1,10 @@
-from application.placed_function import PlacedFunction
 from enum import Enum
+from datetime import datetime
+from swiplserver import PrologError, PrologMQI
+from application.placed_function import PlacedFunction
+import logs
+import config
+import global_variables as g
 
 # types of placements
 
@@ -9,6 +14,9 @@ class PlacementType(str, Enum):
     UNPADDED_PLACEMENT = "unPaddedPlacement"
     PADDED_REPLACEMENT = "paddedReplacement"
     UNPADDED_REPLACEMENT = "unPaddedReplacement"
+
+
+# SecFaaS2Fog utilities
 
 
 def get_placement_query(
@@ -59,6 +67,89 @@ def get_placement_query(
 
         case _:
             return None
+
+
+def get_raw_placement(
+    placement_type: PlacementType,
+    orchestration_id: str,
+    generator_id: str = None,
+    starting_function: str = None,
+    starting_nodes: list[str] = None,
+):
+    """
+    Returns the application placement found by SecFaaS2Fog.
+    Returns a 3-tuple (placement, execution start, execution end):
+    placement is None if query is not good
+    placement is an empty dictionary if the application cannot be placed
+    placement is a valid dictionary if the application can be placed
+    """
+
+    logger = logs.get_logger()
+
+    # prepare the query
+    query = ""
+
+    # if we need a replacement, we have to pass starting function and starting node
+    if placement_type in [
+        PlacementType.PADDED_REPLACEMENT,
+        PlacementType.UNPADDED_REPLACEMENT,
+    ]:
+        query = get_placement_query(
+            placement_type=placement_type,
+            max_placement_time=config.sim_max_placement_time,
+            orchestration_id=orchestration_id,
+            starting_function=starting_function,
+            starting_nodes=starting_nodes,
+        )
+    elif placement_type in [
+        PlacementType.PADDED_PLACEMENT,
+        PlacementType.UNPADDED_PLACEMENT,
+    ]:
+        query = get_placement_query(
+            placement_type=placement_type,
+            max_placement_time=config.sim_max_placement_time,
+            orchestration_id=orchestration_id,
+            generator_id=generator_id,
+        )
+
+    if query is None:
+        return None, None
+
+    # try to place this app with SecFaaS2Fog
+
+    # it will reply with a valid placement iff application can be placed
+    raw_placement = None
+    query_result = False
+
+    with PrologMQI(prolog_path_args=["-s", g.secfaas2fog_placer_path]) as mqi:
+        with mqi.create_thread() as prolog_thread:
+
+            try:
+
+                # save SecFaaS2Fog starting time
+                start_time = datetime.now()
+
+                query_result = prolog_thread.query(query)
+
+            except PrologError as error:
+                logger.error(f"Prolog execution failed: {str(error)}")
+
+            finally:
+                # save SecFaaS2Fog finish time
+                end_time = datetime.now()
+
+    # calculate time of execution
+    end_secs = end_time.timestamp()
+    start_secs = start_time.timestamp()
+    execution_time = (end_secs - start_secs) * 1000
+
+    if query_result and isinstance(query_result, list):
+
+        raw_placement: dict = query_result[0]  # it is a dictionary
+
+        return raw_placement, execution_time
+
+    return {}, execution_time
 
 
 # function used to parse prolog placement

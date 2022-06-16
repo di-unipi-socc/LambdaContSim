@@ -1,12 +1,9 @@
-from math import inf
 import sys
-from datetime import datetime
-from swiplserver import PrologError, PrologMQI
 import json
 from application.application import Application, ApplicationState
-from application.placed_function import FunctionState, PlacedFunction
+from application.placed_function import FunctionState
 from config import parse_config
-from generate_infrastructure import generate_infrastructure
+from infrastructure.utils import generate_infrastructure, dump_infrastructure
 from infrastructure.infrastructure import Infrastructure, LinkInfo
 from infrastructure.logical_infrastructure import LogicalInfrastructure
 from infrastructure.node import NodeCategory
@@ -16,16 +13,21 @@ import config
 from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from orchestration.function_process import FunctionProcess
 import logs
-import logging
 from placement import (
     PlacementType,
     build_app_chain,
-    get_placement_query,
+    get_raw_placement,
     parse_placement,
 )
 import simpy
 import global_variables as g
-from utils import get_ready_functions, get_recursive_dependents, is_edge_part, take_decision, get_oldest
+from utils import (
+    get_ready_functions,
+    get_recursive_dependents,
+    is_edge_part,
+    take_decision,
+    get_oldest
+)
 import random
 
 # Statistical variables
@@ -45,189 +47,6 @@ def print_usage():
     )
     print("\nOptions:")
     print("-c <config file> application config (default config.yaml)")
-
-
-def dump_infrastructure(infrastructure: Infrastructure, output_filename: str):
-    """Dump infrastructure on a given file"""
-
-    lines = []
-
-    nodes_dict: dict = infrastructure.nodes
-
-    # get crashed nodes
-    crashed_nodes = infrastructure.crashed_nodes
-    # get crashed links
-    crashed_links = infrastructure.crashed_links
-    # get graph nodes
-    graph_nodes = infrastructure.graph.nodes()
-
-    for node_id in graph_nodes:
-        node_obj = nodes_dict[node_id]
-        # if the node is not available, don't write it
-        if node_id not in crashed_nodes:
-            node_string = (
-                f"node({node_obj.id}, {node_obj.category.value}, {node_obj.provider}, ["
-            )
-            for sec_cap in node_obj.security_capabilites:
-                node_string += sec_cap + ", "
-            node_string = node_string.removesuffix(", ")
-            node_string += "], ["
-            for sw_cap in node_obj.software_capabilites:
-                node_string += sw_cap + ", "
-            node_string = node_string.removesuffix(", ")
-            node_string += f"], ({str(node_obj.memory)}, {str(node_obj.v_cpu)}, {str(node_obj.mhz)}))."
-            lines.append(node_string)
-
-    # event generators
-    for event_gen in infrastructure.event_generators:
-        # if the node where the event generator is placed is not available, don't write it
-        if event_gen.source_node not in crashed_nodes:
-            string = f"eventGenerator({event_gen.generator_id}, ["
-            for event, _ in event_gen.events:
-                string += event + ", "
-            string = string.removesuffix(", ")
-            string += f"], {event_gen.source_node})."
-            lines.append(string)
-
-    # services
-    for service in infrastructure.services:
-        # if the node where the service is deployed is not available, don't write it
-        if service.deployed_node not in crashed_nodes:
-            string = f"service({service.id}, {service.provider}, {service.type}, {service.deployed_node})."
-            lines.append(string)
-
-    # we need these lines in order to declare links as unidirectionals
-    lines.append("link(X,X,0).")
-    lines.append("link(X,Y,L) :- dif(X,Y), (latency(X,Y,L);latency(Y,X,L)).")
-
-    # latencies
-
-    # get latencies informations
-    links = infrastructure.links
-
-    # get nodes as list
-    nodes_list: list[str] = list(graph_nodes)
-
-    for index1 in range(0, len(nodes_list)):
-
-        # get first node id
-        node1 = nodes_list[index1]
-
-        # don't write a link with a crashed node
-        if node1 in crashed_nodes:
-            continue
-
-        for index2 in range(index1, len(nodes_list)):
-
-            # get second node id
-            node2 = nodes_list[index2]
-
-            # don't write a link with a crashed node
-            if node2 in crashed_nodes:
-                continue
-
-            # if there is no possibility to connect node1 and node2 latency is inf
-            if links[node1][LinkInfo.LATENCY][node2] is inf:
-                continue
-
-            # logical crashed links are unreachable (latency is infinity)
-            if isinstance(infrastructure, LogicalInfrastructure) and (
-                (node1, node2) in crashed_links or (node2, node1) in crashed_links
-            ):
-                string = f"latency({node1}, {node2}, inf)."
-            else:
-                # physical links still exist because another path has been found
-                string = f"latency({node1}, {node2}, {links[node1][LinkInfo.LATENCY][node2]})."
-
-            lines.append(string)
-
-    # overwrite file
-    with open(output_filename, "w") as file:
-        for line in lines:
-            file.write(line + "\n")
-
-
-def get_raw_placement(
-    placement_type: PlacementType,
-    orchestration_id: str,
-    generator_id: str = None,
-    starting_function: str = None,
-    starting_nodes: list[str] = None,
-):
-    """
-    Returns the application placement found by SecFaaS2Fog.
-    Returns a 3-tuple (placement, execution start, execution end):
-    placement is None if query is not good
-    placement is an empty dictionary if the application cannot be placed
-    placement is a valid dictionary if the application can be placed
-    """
-
-    logger = logs.get_logger()
-
-    # prepare the query
-    query = ""
-
-    # if we need a replacement, we have to pass starting function and starting node
-    if placement_type in [
-        PlacementType.PADDED_REPLACEMENT,
-        PlacementType.UNPADDED_REPLACEMENT,
-    ]:
-        query = get_placement_query(
-            placement_type=placement_type,
-            max_placement_time=config.sim_max_placement_time,
-            orchestration_id=orchestration_id,
-            starting_function=starting_function,
-            starting_nodes=starting_nodes,
-        )
-    elif placement_type in [
-        PlacementType.PADDED_PLACEMENT,
-        PlacementType.UNPADDED_PLACEMENT,
-    ]:
-        query = get_placement_query(
-            placement_type=placement_type,
-            max_placement_time=config.sim_max_placement_time,
-            orchestration_id=orchestration_id,
-            generator_id=generator_id,
-        )
-
-    if query is None:
-        return None, None
-
-    # try to place this app with SecFaaS2Fog
-
-    # it will reply with a valid placement iff application can be placed
-    raw_placement = None
-    query_result = False
-
-    with PrologMQI(prolog_path_args=["-s", g.secfaas2fog_placer_path]) as mqi:
-        with mqi.create_thread() as prolog_thread:
-
-            try:
-
-                # save SecFaaS2Fog starting time
-                start_time = datetime.now()
-
-                query_result = prolog_thread.query(query)
-
-            except PrologError as error:
-                logger.error(f"Prolog execution failed: {str(error)}")
-
-            finally:
-                # save SecFaaS2Fog finish time
-                end_time = datetime.now()
-
-    # calculate time of execution
-    end_millisec = end_time.timestamp() * 1000
-    start_millisec = start_time.timestamp() * 1000
-    execution_time = end_millisec - start_millisec
-
-    if query_result and isinstance(query_result, list):
-
-        raw_placement = query_result[0]  # it is a dictionary
-
-        return raw_placement, execution_time
-
-    return {}, execution_time
 
 
 def place_application(
@@ -977,6 +796,7 @@ def main(argv):
 
     # if silent mode is active don't show info messages but only errors and criticals
     if config.sim_silent_mode:
+        import logging
         logger.info("Silent mode is now active, only errors will be shown")
         logger.setLevel(logging.ERROR)
 
@@ -997,7 +817,7 @@ def main(argv):
         dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
 
         logger.info(
-            f"Infrastructure generated, it will be saved into the root directory"
+            f"Infrastructure generated, it will be saved into {g.generated_infrastructure_path}"
         )
         shutil.copy(g.secfaas2fog_infrastructure_path, g.generated_infrastructure_path)
 
@@ -1010,8 +830,8 @@ def main(argv):
         shutil.copy(config.infr_filename, g.secfaas2fog_infrastructure_path)
 
     # initialize node stats dictionary
-    for node in infrastructure.nodes.values():
-        node_stats[node.id] = {}
+    for node_id in infrastructure.nodes:
+        node_stats[node_id] = {}
 
     # SIMPY PHASE
 

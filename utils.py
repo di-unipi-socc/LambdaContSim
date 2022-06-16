@@ -1,4 +1,4 @@
-# return a list of functions that can be executed (their dependencies has been already executed)
+"""Utils functions"""
 
 
 def get_ready_functions(application_chain: dict) -> list[str]:
