@@ -20,7 +20,7 @@ from placement import (
     parse_placement,
 )
 import simpy
-import global_variables as g
+import global_constants as gc
 from utils import (
     get_ready_functions,
     get_recursive_dependents,
@@ -454,7 +454,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
             # nodes or links crashed/resurrected - update infastructure.pl
             logger.info("Infrastructure changes - update infrastructure")
-            dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
+            dump_infrastructure(infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
 
         # somehing crashed?
         if crash_occurred:
@@ -557,9 +557,9 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
                     # save application file into default path
                     application_path = os.path.join(
-                        g.applications_path, application_obj.filename
+                        gc.APPLICATIONS_PATH, application_obj.filename
                     )
-                    shutil.copy(application_path, g.secfaas2fog_application_path)
+                    shutil.copy(application_path, gc.SECF2F_APP_PATH)
 
                     (
                         is_successfully_replaced,
@@ -602,7 +602,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                         # application replaced - update infastructure.pl
                         logger.info("Application replaced - update infrastructure")
                         dump_infrastructure(
-                            infrastructure, g.secfaas2fog_infrastructure_path
+                            infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH
                         )
 
                     else:
@@ -679,11 +679,11 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                         # get application path
                         application_filename = config_application["filename"]
                         application_path = os.path.join(
-                            g.applications_path, application_filename
+                            gc.APPLICATIONS_PATH, application_filename
                         )
 
                         # save application file into default path
-                        shutil.copy(application_path, g.secfaas2fog_application_path)
+                        shutil.copy(application_path, gc.SECF2F_APP_PATH)
 
                         # place
                         application_obj = place_application(
@@ -716,7 +716,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                             # application placed - update infastructure.pl
                             logger.info("Application placed - update infrastructure")
                             dump_infrastructure(
-                                infrastructure, g.secfaas2fog_infrastructure_path
+                                infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH
                             )
 
         # get nodes statistics
@@ -739,13 +739,13 @@ def main(argv):
 
     # INITIALIZATION PHASE - Global variables
 
-    g.init()
+    gc.init()
 
     # logging
     logger = logs.init_logger()
 
     # configuration file path, set to default
-    config_path = g.default_config_path
+    config_path = gc.DEFAULT_CONFIG_PATH
 
     # if the user use ask for help, print application usage message
     if "-h" in argv or "--help" in argv:
@@ -773,8 +773,8 @@ def main(argv):
     # check if the path is a file
     if not os.path.exists(config_path) or not os.path.isfile(config_path):
         logger.error("Config path '%s' not exists or is not a file" % config_path)
-        logger.info("Fallback to default config file %s" % g.default_config_path)
-        config_path = g.default_config_path
+        logger.info("Fallback to default config file %s" % gc.DEFAULT_CONFIG_PATH)
+        config_path = gc.DEFAULT_CONFIG_PATH
         # check that the default config exists
         if not os.path.exists(config_path) or not os.path.isfile(config_path):
             logger.critical(
@@ -814,12 +814,12 @@ def main(argv):
         infrastructure = generate_infrastructure()
 
         # save infrastructure file into default path
-        dump_infrastructure(infrastructure, g.secfaas2fog_infrastructure_path)
+        dump_infrastructure(infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
 
         logger.info(
-            f"Infrastructure generated, it will be saved into {g.generated_infrastructure_path}"
+            f"Infrastructure generated, it will be saved into {gc.GENERATED_INFRASTRUCTURE_PATH}"
         )
-        shutil.copy(g.secfaas2fog_infrastructure_path, g.generated_infrastructure_path)
+        shutil.copy(gc.SECF2F_INFRASTRUCTURE_PATH, gc.GENERATED_INFRASTRUCTURE_PATH)
 
     else:
 
@@ -827,7 +827,7 @@ def main(argv):
         infrastructure = LogicalInfrastructure.loads(config.infr_filename)
 
         # save infrastructure file into default path
-        shutil.copy(config.infr_filename, g.secfaas2fog_infrastructure_path)
+        shutil.copy(config.infr_filename, gc.SECF2F_INFRASTRUCTURE_PATH)
 
     # initialize node stats dictionary
     for node_id in infrastructure.nodes:

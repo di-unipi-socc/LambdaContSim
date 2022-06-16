@@ -4,7 +4,7 @@ from swiplserver import PrologError, PrologMQI
 from application.placed_function import PlacedFunction
 import logs
 import config
-import global_variables as g
+import global_constants as gc
 
 # types of placements
 
@@ -121,7 +121,7 @@ def get_raw_placement(
     raw_placement = None
     query_result = False
 
-    with PrologMQI(prolog_path_args=["-s", g.secfaas2fog_placer_path]) as mqi:
+    with PrologMQI(prolog_path_args=["-s", gc.SECF2F_PLACER_PATH]) as mqi:
         with mqi.create_thread() as prolog_thread:
 
             try:

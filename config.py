@@ -1,6 +1,6 @@
 import yaml
 import os
-import global_variables as g
+import global_constants as gc
 import logs
 from datetime import datetime
 
@@ -144,7 +144,7 @@ def parse_config(path):
         # if the infrastructur is logical, we need to take it from a Prolog file
         if infr_type == "logical":
             infr_temp_filename = str(config["infrastructure"]["filename"])
-            infr_filename = os.path.join(g.infrastructures_path, infr_temp_filename)
+            infr_filename = os.path.join(gc.INFRASTRUCTURES_PATH, infr_temp_filename)
 
             if not os.path.isfile(infr_filename):
                 logger.error(
@@ -207,7 +207,7 @@ def parse_config(path):
         for app_name in applications:
             app = applications[app_name]
             application_filename = app["filename"]
-            application_path = os.path.join(g.applications_path, application_filename)
+            application_path = os.path.join(gc.APPLICATIONS_PATH, application_filename)
             if not os.path.isfile(application_path):
                 logger.error(f"{app_name} application path is not a file")
                 return False
