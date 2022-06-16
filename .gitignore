@@ -140,4 +140,7 @@ dmypy.json
 # Project output files
 *infrastructure.pl
 
+# Configs
+*.yaml
+
 # ADD HERE FILES AND FOLDERS TO BE IGNORED
