@@ -10,6 +10,7 @@ import random
 
 
 class LogicalInfrastructure(Infrastructure):
+
     def __init__(self, nodes, graph, links, event_generators, services):
         self.nodes = nodes
         self.graph = graph
@@ -26,7 +27,7 @@ class LogicalInfrastructure(Infrastructure):
 
         nodes: dict[str, (Node, bool)] = {}
         edges = []
-        event_generators: list[EventGenerator] = []
+        event_generators: dict[str, EventGenerator] = {}
         services: list[Service] = []
 
         # Prolog lines pattern
@@ -110,7 +111,7 @@ class LogicalInfrastructure(Infrastructure):
                         source_node=node_id,
                     )
                     # append to the list
-                    event_generators.append(event_gen)
+                    event_generators[generator_id] = event_gen
 
                 elif line.startswith("service"):
                     line = line.replace(" ", "")

@@ -159,7 +159,7 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
 
     # event generators
 
-    event_generators: list[EventGenerator] = []
+    event_generators: dict[str, EventGenerator] = {}
 
     min_num_generators = config["event_generators"]["generators"]["min_quantity"]
     max_num_generators = config["event_generators"]["generators"]["max_quantity"]
@@ -202,11 +202,11 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
         chosen_node_id = chosen_node.id
 
         # create the generator
-        generator_name = generator_basename + str(index)
+        generator_id = generator_basename + str(index)
         event_generator = EventGenerator(
-            generator_name, events_with_probability, chosen_node_id
+            generator_id, events_with_probability, chosen_node_id
         )
-        event_generators.append(event_generator)
+        event_generators[generator_id] = event_generator
 
     # services
     services: list[Service] = []
@@ -296,7 +296,7 @@ def dump_infrastructure(infrastructure: Infrastructure, output_filename: str):
             lines.append(node_string)
 
     # event generators
-    for event_gen in infrastructure.event_generators:
+    for event_gen in infrastructure.event_generators.values():
         # if the node where the event generator is placed is not available, don't write it
         if event_gen.source_node not in crashed_nodes:
             string = f"eventGenerator({event_gen.generator_id}, ["

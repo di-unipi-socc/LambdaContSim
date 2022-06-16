@@ -9,7 +9,14 @@ class PhysicalInfrastructure(Infrastructure):
     original_graph: nx.Graph
     links_affected_by_crashes: dict[(str | tuple), set]
 
-    def __init__(self, nodes, graph, links, event_generators, services):
+    def __init__(
+        self,
+        nodes: dict,
+        graph: nx.Graph,
+        links: dict,
+        event_generators: dict,
+        services: list,
+    ):
         self.nodes = nodes
         self.original_graph = graph
         self.graph = graph

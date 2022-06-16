@@ -78,11 +78,9 @@ def place_application(
     )
 
     # get the node where the generator is placed
-    generator_node = [
-        gen
-        for gen in infrastructure.event_generators
-        if gen.generator_id == generator_id
-    ][0].source_node
+    generator_node = infrastructure.event_generators[
+        generator_id
+    ].source_node
 
     application_can_be_placed = False
 
@@ -662,7 +660,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
         # PLACEMENT PHASE
 
         # for each event generator
-        for event_generator in infrastructure.event_generators:
+        for event_generator in infrastructure.event_generators.values():
 
             # the event generator can't be triggered if it is inside a crashed node
             if event_generator.source_node in infrastructure.crashed_nodes:
