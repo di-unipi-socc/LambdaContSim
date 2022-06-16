@@ -64,55 +64,59 @@ def get_placement_query(
 # function used to parse prolog placement
 
 
-def rec_parse_placement(dictionary: dict, placement: dict, is_guard: bool):
+def rec_parse_placement(dictionary: dict, placement: dict, is_guard: bool = False):
     expression = dictionary["functor"]
-    if expression == "fp":
-        function_id = dictionary.get("args")[0]
-        node_id = dictionary.get("args")[5]
-        sw_reqs = dictionary.get("args")[2]
 
-        # hardware reqs are already padded
-        hw_reqs = dictionary.get("args")[3]
-        memory_req = hw_reqs.get("args")[0]
-        v_cpu_req = hw_reqs.get("args")[1].get("args")[0]
-        mhz_req = hw_reqs.get("args")[1].get("args")[1]
+    match expression:
+        case "fp":
+            function_id: str = dictionary.get("args")[0]
+            node_id: str = dictionary.get("args")[5]
+            sw_reqs = dictionary.get("args")[2]
 
-        function = PlacedFunction(
-            function_id, node_id, sw_reqs, memory_req, v_cpu_req, mhz_req, is_guard
-        )
+            # hardware reqs are already padded
+            hw_reqs = dictionary.get("args")[3]
+            memory_req = hw_reqs.get("args")[0]
+            v_cpu_req = hw_reqs.get("args")[1].get("args")[0]
+            mhz_req = hw_reqs.get("args")[1].get("args")[1]
 
-        return {function_id: function}
-    elif expression == "if":
-        guard = rec_parse_placement(dictionary.get("args")[0], placement, True)
-        c1 = rec_parse_placement(dictionary.get("args")[1], placement, False)
-        c2 = rec_parse_placement(dictionary.get("args")[2], placement, False)
+            function = PlacedFunction(
+                function_id, node_id, sw_reqs, memory_req, v_cpu_req, mhz_req, is_guard
+            )
 
-        placement.update(guard)
-        placement.update(c1)
-        placement.update(c2)
+            return {function_id: function}
+        case "if":
+            guard = rec_parse_placement(dictionary.get("args")[0], placement, True)
+            c1 = rec_parse_placement(dictionary.get("args")[1], placement)
+            c2 = rec_parse_placement(dictionary.get("args")[2], placement)
 
-        return placement
-    elif expression == "par":
-        c1 = rec_parse_placement(dictionary.get("args")[0][0], placement, False)
-        c2 = rec_parse_placement(dictionary.get("args")[0][1], placement, False)
+            placement.update(guard)
+            placement.update(c1)
+            placement.update(c2)
 
-        placement.update(c1)
-        placement.update(c2)
+            return placement
+        case "par":
+            c1 = rec_parse_placement(dictionary.get("args")[0][0], placement)
+            c2 = rec_parse_placement(dictionary.get("args")[0][1], placement)
 
-        return placement
-    elif expression == "seq":
-        c1 = rec_parse_placement(dictionary.get("args")[0], placement, False)
-        c2 = rec_parse_placement(dictionary.get("args")[1], placement, False)
+            placement.update(c1)
+            placement.update(c2)
 
-        placement.update(c1)
-        placement.update(c2)
+            return placement
+        case "seq":
+            c1 = rec_parse_placement(dictionary.get("args")[0], placement)
+            c2 = rec_parse_placement(dictionary.get("args")[1], placement)
 
-        return placement
+            placement.update(c1)
+            placement.update(c2)
+
+            return placement
+        case _:
+            return placement
 
 
 def parse_placement(prolog_placement: dict) -> dict[str, PlacedFunction]:
 
-    return rec_parse_placement(prolog_placement["Placement"], {}, False)
+    return rec_parse_placement(prolog_placement["Placement"], {})
 
 
 # functions used to retrieve application chain

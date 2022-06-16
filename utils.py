@@ -17,33 +17,33 @@ def get_ready_functions(application_chain: dict) -> list[str]:
     return to_return
 
 
-def get_next_functions_by_id(application_chain: dict, function_id: str) -> list[str]:
+def get_direct_dependents(application_chain: dict, function_id: str) -> list[str]:
     """
-    Returns the list of functions which depends from function_id.
+    Returns the list of directly dependent functions of function_id
     """
 
     to_return = []
-    functions = application_chain.keys()
-    for fun in functions:
-        dependencies = application_chain.get(fun)
+    for function_key in application_chain:
+        dependencies : list = application_chain[function_key]
         if function_id in dependencies:
-            to_return.append(fun)
+            to_return.append(function_key)
 
     return to_return
 
 
-def delete_executed_function(application_chain: dict, finished_function):
+def delete_executed_function(application_chain: dict, function_id):
     """
-    Delete finished_function from the chain
+    Delete function_id from the chain:
+    - delete its key in the chain
+    - delete itself from other functions' lists
     """
 
-    application_chain.pop(finished_function)
+    application_chain.pop(function_id)
 
-    functions = application_chain.keys()
-    for fun in functions:
-        dependencies: list = application_chain.get(fun)
-        if finished_function in dependencies:
-            dependencies.remove(finished_function)
+    for function_key in application_chain:
+        dependencies: list = application_chain[function_key]
+        if function_id in dependencies:
+            dependencies.remove(function_id)
 
 
 def delete_functions_chain_by_id(application_chain: dict, function_to_remove) -> list:
@@ -73,18 +73,12 @@ def delete_functions_chain_by_id(application_chain: dict, function_to_remove) ->
     return result
 
 
-def get_recursive_dependents(start_function: str, application_chain: dict) -> list:
+def get_recursive_dependents(function_id: str, application_chain: dict) -> list:
     """
-    Returns the list of dependent functions of start_function
+    Returns the list of dependent functions of function_id
     """
 
-    dependents = []
-
-    functions = application_chain.keys()
-    for fun in functions:
-        dependencies: list = application_chain.get(fun)
-        if start_function in dependencies:
-            dependents.append(fun)
+    dependents = get_direct_dependents(application_chain, function_id)
 
     to_return = dependents
 
@@ -94,12 +88,12 @@ def get_recursive_dependents(start_function: str, application_chain: dict) -> li
     return list(set(to_return))
 
 
-def find_functions_level(result: dict, function, chain, level):
+def find_functions_level(result: dict, function: str, chain: dict, level:int = 0):
     """
     Find for each function in the chain its level of execution
     """
 
-    list_of_functions = get_next_functions_by_id(chain, function)
+    list_of_functions = get_direct_dependents(chain, function)
 
     old_level = result[function] if function in result.keys() else 0
 
@@ -118,7 +112,7 @@ def get_oldest(interested_functions: list, original_chain: dict[str, list]):
     first_function = get_ready_functions(original_chain)[0]
 
     levels_by_function = {}
-    find_functions_level(levels_by_function, first_function, original_chain, 0)
+    find_functions_level(levels_by_function, first_function, original_chain)
 
     functions_by_level: dict[int, list] = {}
 
@@ -169,7 +163,8 @@ def get_oldest(interested_functions: list, original_chain: dict[str, list]):
 
 def is_edge_part(path: list, node_x: str, node_y: str):
     """
-    Returns true if the edge is part of the path
+    Returns True if the edge is part of the path
+    False otherwise
     """
     try:
         index = path.index(node_x)
@@ -187,8 +182,11 @@ def is_edge_part(path: list, node_x: str, node_y: str):
         return False
 
 
-def take_decision(probability: float) -> bool:
+def take_decision(true_probability: float) -> bool:
+    """
+    Returns True with probabilty true_probability
+    """
 
     import random
 
-    return random.random() < probability
+    return random.random() < true_probability

@@ -696,11 +696,11 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                     )
 
                     # get the list of function which depends by start_function
-                    dependents_functions = get_recursive_dependents(
+                    dependent_functions = get_recursive_dependents(
                         start_function, application_obj.chain
                     )
 
-                    functions_to_be_released = [start_function] + dependents_functions
+                    functions_to_be_released = [start_function] + dependent_functions
 
                     # release all resources of start function and its dependents
                     for function_name in functions_to_be_released:

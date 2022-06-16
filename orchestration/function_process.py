@@ -9,7 +9,7 @@ from logs import get_logger
 from utils import (
     delete_executed_function,
     delete_functions_chain_by_id,
-    get_next_functions_by_id,
+    get_direct_dependents,
     get_ready_functions,
     take_decision,
 )
@@ -56,7 +56,7 @@ class FunctionProcess:
         self.fun.state = FunctionState.COMPLETED
 
         # get functions which depends on me
-        dependent_functions: list = get_next_functions_by_id(
+        dependent_functions: list = get_direct_dependents(
             self.application.chain, self.fun.id
         )
 
@@ -113,13 +113,13 @@ class FunctionProcess:
                 self.application.chain, discarded_branch
             )
             # release resources
-            for fun in deleted_functions:
-                self.application.placement[fun].state = FunctionState.BRANCH_NOT_TAKEN
-                node_id = self.application.placement[fun].node_id
+            for function_name in deleted_functions:
+                self.application.placement[function_name].state = FunctionState.BRANCH_NOT_TAKEN
+                node_id = self.application.placement[function_name].node_id
                 node: Node = self.application.infrastructure_nodes[node_id]
                 node.release_resources(
-                    self.application.placement[fun].memory,
-                    self.application.placement[fun].v_cpu,
+                    self.application.placement[function_name].memory,
+                    self.application.placement[function_name].v_cpu,
                 )
 
             # execute the taken function
@@ -140,10 +140,10 @@ class FunctionProcess:
 
         # release resources
 
-        fun_name = self.fun.id
-        node_id = self.application.placement[fun_name].node_id
+        function_name = self.fun.id
+        node_id = self.fun.node_id
         node: Node = self.application.infrastructure_nodes[node_id]
         node.release_resources(
-            self.application.placement[fun_name].memory,
-            self.application.placement[fun_name].v_cpu,
+            self.application.placement[function_name].memory,
+            self.application.placement[function_name].v_cpu,
         )
