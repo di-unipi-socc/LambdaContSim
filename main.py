@@ -14,7 +14,6 @@ import os
 import shutil
 import config
 from infrastructure.physical_infrastructure import PhysicalInfrastructure
-from orchestration.orchestrator import Orchestrator
 from orchestration.function_process import FunctionProcess
 import logs
 import logging
@@ -878,8 +877,19 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
                         if application_obj is not None:
                             # launch application
-                            thread = Orchestrator(env=env, application=application_obj)
-                            thread.start()
+                            
+                            # get first functions to execute from the chain
+                            ready_functions: list = get_ready_functions(application_obj.chain)
+
+                            # set application as running
+                            application_obj.state = ApplicationState.RUNNING
+
+                            # execute ready functions
+                            for function_name in ready_functions:
+                                fun_process = FunctionProcess(
+                                    application_obj.placement[function_name], env, application_obj
+                                )
+                                application_obj.function_processes[function_name] = fun_process
 
                             # add application into the list
                             list_of_applications.append(application_obj)
