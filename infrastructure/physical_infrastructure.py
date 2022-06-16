@@ -98,7 +98,7 @@ class PhysicalInfrastructure(Infrastructure):
             )
 
     def recalculate_routes_after_resurrection(
-        self, resurrected_nodes, resurrected_link
+        self, resurrected_nodes: list, resurrected_link: tuple
     ):
         # instance a copy of the original graph
         resulting_graph: nx.Graph = self.original_graph.copy()
@@ -119,6 +119,8 @@ class PhysicalInfrastructure(Infrastructure):
         links_to_recalc = set()
         for key in resurrected_keys:
             links_to_recalc.update(self.links_affected_by_crashes[key])
+            # clear the set
+            self.links_affected_by_crashes[key].clear()
 
         # recalculate links' latency and path
         for source, target in links_to_recalc:
