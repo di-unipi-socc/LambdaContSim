@@ -13,7 +13,7 @@ from matplotlib import pyplot
 import config as general_config
 
 
-def generate_infrastructure() -> PhysicalInfrastructure:
+def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
     """Generate a Physical infrastructure"""
 
     # declare NetworkX graph
@@ -23,7 +23,7 @@ def generate_infrastructure() -> PhysicalInfrastructure:
 
     config : dict
 
-    with open("infrastructure_config.yaml", "r") as file:
+    with open(config_filename, "r") as file:
 
         # load config yaml file into a dictionary
         config = yaml.load(file, Loader=yaml.FullLoader)

@@ -46,7 +46,8 @@ def print_usage():
         % os.path.basename(sys.argv[0])
     )
     print("\nOptions:")
-    print("-c <config file> application config (default config.yaml)")
+    print("-c <config file> simulator config (default config.yaml)")
+    print("-i <infrastructure config file> physical infrastructure config (default infrastructure_config.yaml)")
 
 
 def place_application(
@@ -746,31 +747,36 @@ def main(argv):
 
     # configuration file path, set to default
     config_path = gc.DEFAULT_CONFIG_PATH
+    # infrastructure configuration file path, set to default
+    infrastructure_config_path = gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH
+    # infrastructure config file has given
+    infrastructure_given = False
 
     # if the user use ask for help, print application usage message
     if "-h" in argv or "--help" in argv:
         print_usage()
         return 0
 
-    # we should have 0 or at most 2 command line arguments (-c config)
-    if len(argv) not in [0, 2]:
-        print_usage()
-        return 1
-
     # parse command line arguments
     for i in range(0, len(argv) - 1, 2):
-
-        option = argv[i]
+        option : str = argv[i]
         option_value = argv[i + 1]
 
-        if option == "-c":
-            # save into config_path variable
-            config_path = option_value
-        else:
-            # unknown option
-            logger.info("Unknown %s option", option)
+        if not option.startswith("-"):
+            logger.error("Invalid: %s is not an option", option)
+            continue
 
-    # check if the path is a file
+        match option:
+            case "-c":
+                config_path = option_value
+            case "-i":
+                infrastructure_config_path = option_value
+                infrastructure_given = True
+            case _:
+                # unknown option
+                logger.info("Unknown %s option", option)
+
+    # check if the given config path is a file
     if not os.path.exists(config_path) or not os.path.isfile(config_path):
         logger.error("Config path '%s' not exists or is not a file" % config_path)
         logger.info("Fallback to default config file %s" % gc.DEFAULT_CONFIG_PATH)
@@ -783,6 +789,28 @@ def main(argv):
             )
             print_usage()
             return 1
+    
+    if infrastructure_given:
+        # check if the given infrastructure config path is a file
+        if (
+            not os.path.exists(infrastructure_config_path)
+            or not os.path.isfile(infrastructure_config_path)
+        ):
+            logger.error(
+                f"Infrastructure config path {infrastructure_config_path} not exists or is not a file"
+            )
+            logger.info(f"Fallback to default config file {gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH}")
+            infrastructure_config_path = gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH
+            # check that the default config exists
+            if (
+                not os.path.exists(infrastructure_config_path)
+                or not os.path.isfile(infrastructure_config_path)
+            ):
+                logger.critical(
+                    f"Default config path {infrastructure_config_path} not exists or is not a file, exit..."
+                )
+                print_usage()
+                return 1
 
     # parse the config file
     parsing_succeed = parse_config(config_path)
@@ -811,7 +839,7 @@ def main(argv):
         logger.info("Infrastructure generation is starting")
 
         # randomly generate the infrastructure
-        infrastructure = generate_infrastructure()
+        infrastructure = generate_infrastructure(infrastructure_config_path)
 
         # save infrastructure file into default path
         dump_infrastructure(infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
@@ -824,10 +852,10 @@ def main(argv):
     else:
 
         # load infrastructure from the Prolog file
-        infrastructure = LogicalInfrastructure.loads(config.infr_filename)
+        infrastructure = LogicalInfrastructure.loads(config.infr_logical_filename)
 
         # save infrastructure file into default path
-        shutil.copy(config.infr_filename, gc.SECF2F_INFRASTRUCTURE_PATH)
+        shutil.copy(config.infr_logical_filename, gc.SECF2F_INFRASTRUCTURE_PATH)
 
     # initialize node stats dictionary
     for node_id in infrastructure.nodes:

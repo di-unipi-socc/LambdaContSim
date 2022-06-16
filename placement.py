@@ -78,10 +78,10 @@ def get_raw_placement(
 ):
     """
     Returns the application placement found by SecFaaS2Fog.
-    Returns a 3-tuple (placement, execution start, execution end):
-    placement is None if query is not good
-    placement is an empty dictionary if the application cannot be placed
-    placement is a valid dictionary if the application can be placed
+    Returns a tuple (placement, execution time):
+    - placement is None if query is invalid
+    - placement is an empty dictionary if the application cannot be placed
+    - placement is a valid dictionary if the application can be placed
     """
 
     logger = logs.get_logger()

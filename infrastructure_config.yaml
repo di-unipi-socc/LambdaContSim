@@ -3,7 +3,6 @@ number_of_nodes:
   fog: 25
   edge: 10
 
-
 nodes:
   cloud:
     - probability: 1

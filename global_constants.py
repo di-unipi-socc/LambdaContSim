@@ -10,6 +10,7 @@ SECF2F_INFRASTRUCTURE_PATH = ""
 INFRASTRUCTURES_PATH = ""
 APPLICATIONS_PATH = ""
 DEFAULT_CONFIG_PATH = ""
+DEFAULT_INFRASTRUCTURE_CONFIG_PATH = ""
 GENERATED_INFRASTRUCTURE_PATH = ""
 
 
@@ -25,6 +26,7 @@ def init():
     global INFRASTRUCTURES_PATH
     global APPLICATIONS_PATH
     global DEFAULT_CONFIG_PATH
+    global DEFAULT_INFRASTRUCTURE_CONFIG_PATH
     global GENERATED_INFRASTRUCTURE_PATH
 
     # define where SecFaaS2Fog is
@@ -45,6 +47,9 @@ def init():
 
     # default config path
     DEFAULT_CONFIG_PATH = os.path.join(os.curdir, "config.yaml")
+
+    # default infrastructure config path
+    DEFAULT_INFRASTRUCTURE_CONFIG_PATH = os.path.join(os.curdir, "infrastructure_config.yaml")
 
     # where we save the generated infrastructure file
     GENERATED_INFRASTRUCTURE_PATH = os.path.join(
