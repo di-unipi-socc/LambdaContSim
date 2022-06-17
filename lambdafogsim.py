@@ -538,6 +538,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                 ):
                                     interested_functions.add(placed_function.id)
                                     option1_verified = True
+                                    break
                         
                         # Option 2
                         # check only if option 1 is not verified
