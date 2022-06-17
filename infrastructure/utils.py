@@ -209,7 +209,7 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
         event_generators[generator_id] = event_generator
 
     # services
-    services: list[Service] = []
+    services: dict[str, Service] = {}
     config_services = config["services"]
     index = 0
 
@@ -228,10 +228,10 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
                 index += 1
                 node_id = node.id
                 service_id = service["base_name"] + str(index)
-                servicex = Service(
+                service_obj = Service(
                     service_id, service["provider"], service["type"], node_id
                 )
-                services.append(servicex)
+                services[service_id] = service_obj
 
     """
     # plot the graph
@@ -307,7 +307,7 @@ def dump_infrastructure(infrastructure: Infrastructure, output_filename: str):
             lines.append(string)
 
     # services
-    for service in infrastructure.services:
+    for service in infrastructure.services.values():
         # if the node where the service is deployed is not available, don't write it
         if service.deployed_node not in crashed_nodes:
             string = f"service({service.id}, {service.provider}, {service.type}, {service.deployed_node})."

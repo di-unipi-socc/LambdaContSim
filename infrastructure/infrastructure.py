@@ -19,7 +19,7 @@ class Infrastructure(ABC):
     graph: nx.Graph
     links: dict[str, dict[LinkInfo, dict[str, (int | list)]]]
     event_generators: dict[str, EventGenerator]
-    services: list[Service]
+    services: dict[str, Service]
 
     # crashed nodes
     crashed_nodes = []

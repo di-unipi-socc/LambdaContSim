@@ -15,7 +15,7 @@ class PhysicalInfrastructure(Infrastructure):
         graph: nx.Graph,
         links: dict,
         event_generators: dict,
-        services: list,
+        services: dict,
     ):
         self.nodes = nodes
         self.original_graph = graph

@@ -11,7 +11,14 @@ import random
 
 class LogicalInfrastructure(Infrastructure):
 
-    def __init__(self, nodes, graph, links, event_generators, services):
+    def __init__(
+        self,
+        nodes: dict,
+        graph: nx.Graph,
+        links: dict,
+        event_generators: dict,
+        services: dict,
+    ):
         self.nodes = nodes
         self.graph = graph
         self.links = links
@@ -28,7 +35,7 @@ class LogicalInfrastructure(Infrastructure):
         nodes: dict[str, (Node, bool)] = {}
         edges = []
         event_generators: dict[str, EventGenerator] = {}
-        services: list[Service] = []
+        services: dict[str, Service] = {}
 
         # Prolog lines pattern
         node_pattern = r"^node\(([^,]+),([^,]+),([^,]+),(\[.*?\]),(\[.*?\]),\(([^,]+),([^,]+),([^\)]+)\)\)\.*"
@@ -110,7 +117,7 @@ class LogicalInfrastructure(Infrastructure):
                         events=events_with_probability,
                         source_node=node_id,
                     )
-                    # append to the list
+                    # add to the dict
                     event_generators[generator_id] = event_gen
 
                 elif line.startswith("service"):
@@ -129,8 +136,8 @@ class LogicalInfrastructure(Infrastructure):
                         type=service_type,
                         deployed_node=deployed_node,
                     )
-                    # append to the list
-                    services.append(service)
+                    # add to the dict
+                    services[service_id] = service
 
             # add edges to the graph
             graph.add_weighted_edges_from(edges)
