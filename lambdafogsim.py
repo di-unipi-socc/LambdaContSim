@@ -476,8 +476,15 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                 for placed_function in application_obj.placement.values():
 
                     # NODE crash
-                    # check if there is at least one function deployed in the crashed nodes
                     # check only waiting and running functions
+                    # Option 1:
+                    # check if there is at least one function deployed in a crashed node
+                    # OR
+                    # Option 2:
+                    # check if there is at least one function which depends on a service deployed in a crashed node
+
+                    # function is interested by the node crash?
+                    node_crash_verified = False
 
                     if crashed_nodes:
 
@@ -485,17 +492,38 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                             FunctionState.WAITING,
                             FunctionState.RUNNING,
                         ]:
+                            # Option 1: is the function deployed in a crashed node?
                             if placed_function.node_id in crashed_nodes:
                                 interested_functions.add(placed_function.id)
+                                node_crash_verified = True
+                            else:
+                                # Option 2: is one of its services deployed in a crashed node?
+                                for service_id in placed_function.linked_services:
+                                    service = infrastructure.services[service_id]
+                                    if service.deployed_node in crashed_nodes:
+                                        interested_functions.add(placed_function.id)
+                                        node_crash_verified = True
+                                        break
 
                     # LINK crash
+                    # Option 1: Crashed link between 2 functions
                     # if there is a waiting function2 deployed on nodeY
                     # for any function1 deployed on nodeX
-                    # where function2 is dependent on function1
+                    # where function2 depends on function1
+                    # check if the link (node1, node2) belongs to the path from nodeX to nodeY
+                    # OR
+                    # Option 2: Crashed link between function and one of its service
+                    # if there is a waiting or running functionX on nodeX
+                    # for any serviceY deployed on nodeY
+                    # where functionX depends on serviceY
                     # check if the link (node1, node2) belongs to the path from nodeX to nodeY
 
-                    if crashed_link:
+                    # don't check if the function is already 'interested'
+                    if not node_crash_verified and crashed_link:
 
+                        option1_verified = False
+
+                        # Option 1
                         if placed_function.state == FunctionState.WAITING:
                             node_y = placed_function.node_id
                             previous_nodes = placed_function.previous_nodes
@@ -509,6 +537,27 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                     link_crashed_second_node,
                                 ):
                                     interested_functions.add(placed_function.id)
+                                    option1_verified = True
+                        
+                        # Option 2
+                        # check only if option 1 is not verified
+                        if not option1_verified and placed_function.state in [
+                            FunctionState.WAITING,
+                            FunctionState.RUNNING
+                        ]:
+                            node_x = placed_function.node_id
+                            for service_id in placed_function.linked_services:
+                                service_node_y = infrastructure.services[service_id].deployed_node
+                                path = infrastructure.links[node_x][LinkInfo.PATH][
+                                    service_node_y
+                                ]
+                                if is_edge_part(
+                                    path,
+                                    link_crashed_first_node,
+                                    link_crashed_second_node,
+                                ):
+                                    interested_functions.add(placed_function.id)
+                                    break
 
                 # if there is interested functions then application needs to be partially replaced
                 if interested_functions:
