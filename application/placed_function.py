@@ -23,6 +23,8 @@ class PlacedFunction:
     memory: int = 0
     v_cpu: int = 0
     mhz: int = 0
+    # list of linked services
+    linked_services: list[str]
     # is a guard of a conditional state?
     is_guard: bool = False
     # state of the function
@@ -38,6 +40,7 @@ class PlacedFunction:
         memory: int,
         v_cpu: int,
         mhz: int,
+        linked_services: list[str],
         is_guard: bool,
     ):
         self.id = function_id
@@ -46,6 +49,7 @@ class PlacedFunction:
         self.memory = memory
         self.v_cpu = v_cpu
         self.mhz = mhz
+        self.linked_services = linked_services
         self.is_guard = is_guard
         self.state = FunctionState.WAITING
         self.previous_nodes = []

@@ -161,17 +161,24 @@ def rec_parse_placement(dictionary: dict, placement: dict, is_guard: bool = Fals
     match expression:
         case "fp":
             function_id: str = dictionary.get("args")[0]
-            node_id: str = dictionary.get("args")[5]
+            
             sw_reqs = dictionary.get("args")[2]
 
-            # hardware reqs are already padded
             hw_reqs = dictionary.get("args")[3]
             memory_req = hw_reqs.get("args")[0]
             v_cpu_req = hw_reqs.get("args")[1].get("args")[0]
             mhz_req = hw_reqs.get("args")[1].get("args")[1]
 
+            raw_services_list = dictionary.get("args")[4]
+            linked_services : list[str] = []
+            for service in raw_services_list:
+                service_id = service.get("args")[1].get("args")[0]
+                linked_services.append(service_id)
+            
+            node_id: str = dictionary.get("args")[5]
+
             function = PlacedFunction(
-                function_id, node_id, sw_reqs, memory_req, v_cpu_req, mhz_req, is_guard
+                function_id, node_id, sw_reqs, memory_req, v_cpu_req, mhz_req, linked_services, is_guard
             )
 
             return {function_id: function}
