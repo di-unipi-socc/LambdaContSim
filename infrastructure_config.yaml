@@ -88,7 +88,7 @@ nodes:
         v_cpu: 16
         mhz: 2000
   edge:
-    - probability: 0.6
+    - probability: 0.4
       provider: privateCitizen1
       security_caps: []
       software_caps:
@@ -97,7 +97,7 @@ nodes:
         memory: 1024
         v_cpu: 4
         mhz: 2500
-    - probability: 0.4
+    - probability: 0.2
       provider: privateCitizen2
       security_caps:
         - pubKeyE
@@ -107,6 +107,17 @@ nodes:
         memory: 512
         v_cpu: 2
         mhz: 1500
+    - probability: 0.4
+      provider: privateCitizen3
+      security_caps:
+        - pubKeyE
+      software_caps:
+        - js
+        - py3
+      hardware_caps:
+        memory: 1024
+        v_cpu: 4
+        mhz: 3000
 
 latencies:
   cloud:
@@ -114,7 +125,6 @@ latencies:
       edge_probability: 1
       lower: 30
       upper: 55
-      # probability distribution???
     fog:
       edge_probability: 0.7
       lower: 30
