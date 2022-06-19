@@ -44,14 +44,14 @@ def parse_config(path):
 
     logger = logs.get_logger()
 
-    yml_config : dict = {}
+    yml_config: dict = {}
 
     with open(path, "r") as config_file:
 
         # load config yaml file into a dictionary
         try:
             yml_config = yaml.load(config_file, Loader=yaml.FullLoader)
-        
+
         except yaml.YAMLError:
             logger.critical("Error while parsing YAML file: invalid structure")
             return False
@@ -97,9 +97,7 @@ def parse_config(path):
         return False
 
     if sim_seed < -1:
-        logger.error(
-            "Simulator seed must be -1 (ignore seed) or greater or equal 0"
-        )
+        logger.error("Simulator seed must be -1 (ignore seed) or greater or equal 0")
         return False
 
     if sim_max_placement_time < 1:
@@ -120,9 +118,7 @@ def parse_config(path):
         event_generator_trigger_probability > 1
         or event_generator_trigger_probability < 0
     ):
-        logger.error(
-            "Probability of trigger generator must be a value between 0 and 1"
-        )
+        logger.error("Probability of trigger generator must be a value between 0 and 1")
         return False
 
     if event_min_probability > 1 or event_min_probability < 0:

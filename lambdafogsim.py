@@ -38,26 +38,26 @@ node_stats: dict[str, dict] = {}
 link_events: list = []
 
 
-def get_parser() -> argparse.ArgumentParser :
+def get_parser() -> argparse.ArgumentParser:
 
-    parser = argparse.ArgumentParser(
-        description="Simulation with LambdaFogSim"
-    )
+    parser = argparse.ArgumentParser(description="Simulation with LambdaFogSim")
 
     parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         type=str,
         default=gc.DEFAULT_CONFIG_PATH,
         help="simulator config (default config.yaml)",
-        dest='config'
+        dest="config",
     )
 
     parser.add_argument(
-        "-i", "--infrastructure",
+        "-i",
+        "--infrastructure",
         type=str,
         default=gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH,
         help="physical infrastructure config (default infrastructure_config.yaml)",
-        dest='infrastructure_config'
+        dest="infrastructure_config",
     )
 
     return parser
@@ -89,9 +89,7 @@ def place_application(
     )
 
     # get the node where the generator is placed
-    generator_node = infrastructure.event_generators[
-        generator_id
-    ].source_node
+    generator_node = infrastructure.event_generators[generator_id].source_node
 
     application_can_be_placed = False
 
@@ -550,16 +548,18 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                     interested_functions.add(placed_function.id)
                                     option1_verified = True
                                     break
-                        
+
                         # Option 2
                         # check only if option 1 is not verified
                         if not option1_verified and placed_function.state in [
                             FunctionState.WAITING,
-                            FunctionState.RUNNING
+                            FunctionState.RUNNING,
                         ]:
                             node_x = placed_function.node_id
                             for service_id in placed_function.linked_services:
-                                service_node_y = infrastructure.services[service_id].deployed_node
+                                service_node_y = infrastructure.services[
+                                    service_id
+                                ].deployed_node
                                 path = infrastructure.links[node_x][LinkInfo.PATH][
                                     service_node_y
                                 ]

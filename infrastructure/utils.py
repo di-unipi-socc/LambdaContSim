@@ -31,7 +31,7 @@ def generate_infrastructure(config_filename: str):
         # load config yaml file into a dictionary
         try:
             yml_config = yaml.load(file, Loader=yaml.FullLoader)
-        
+
         except yaml.YAMLError:
             logger.critical("Error while parsing YAML file: invalid structure")
             return None

@@ -10,7 +10,6 @@ import random
 
 
 class LogicalInfrastructure(Infrastructure):
-
     def __init__(
         self,
         nodes: dict,
