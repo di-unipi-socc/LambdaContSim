@@ -9,11 +9,11 @@ from infrastructure.physical_infrastructure import PhysicalInfrastructure
 from infrastructure.logical_infrastructure import LogicalInfrastructure
 from infrastructure.service import Service
 from utils import take_decision
-from matplotlib import pyplot
 import config as general_config
+import logs
 
 
-def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
+def generate_infrastructure(config_filename: str):
     """Generate a Physical infrastructure"""
 
     # declare NetworkX graph
@@ -21,18 +21,26 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
 
     num_of_nodes = {}
 
-    config: dict
+    yml_config: dict
+
+    # get logger
+    logger = logs.get_logger()
 
     with open(config_filename, "r") as file:
 
         # load config yaml file into a dictionary
-        config = yaml.load(file, Loader=yaml.FullLoader)
+        try:
+            yml_config = yaml.load(file, Loader=yaml.FullLoader)
+        
+        except yaml.YAMLError:
+            logger.critical("Error while parsing YAML file: invalid structure")
+            return None
 
     # load from config
     for category in ["cloud", "fog", "edge"]:
-        num_of_nodes[category] = config["number_of_nodes"][category]
+        num_of_nodes[category] = yml_config["number_of_nodes"][category]
 
-    config_nodes = config["nodes"]
+    config_nodes = yml_config["nodes"]
 
     nodes_by_category: dict[str, list[Node]] = {}
 
@@ -80,8 +88,8 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
     edges = []
     for category in ["cloud", "fog", "edge"]:
 
-        lower_latency = config["latencies"][category][category]["lower"]
-        upper_latency = config["latencies"][category][category]["upper"]
+        lower_latency = yml_config["latencies"][category][category]["lower"]
+        upper_latency = yml_config["latencies"][category][category]["upper"]
 
         category_nodes = nodes_by_category[category]
         for index in range(0, len(category_nodes) - 1):
@@ -99,7 +107,7 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
 
         category_nodes: list[Node] = nodes_by_category[category]
 
-        latencies = config["latencies"]["cloud"][category]
+        latencies = yml_config["latencies"]["cloud"][category]
         edge_probability = latencies["edge_probability"]
         lower_latency = latencies["lower"]
         upper_latency = latencies["upper"]
@@ -128,7 +136,7 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
 
         category_nodes: list[Node] = nodes_by_category[category]
 
-        latencies = config["latencies"]["fog"][category]
+        latencies = yml_config["latencies"]["fog"][category]
         edge_probability = latencies["edge_probability"]
         lower_latency = latencies["lower"]
         upper_latency = latencies["upper"]
@@ -161,21 +169,21 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
 
     event_generators: dict[str, EventGenerator] = {}
 
-    min_num_generators = config["event_generators"]["generators"]["min_quantity"]
-    max_num_generators = config["event_generators"]["generators"]["max_quantity"]
+    min_num_generators = yml_config["event_generators"]["generators"]["min_quantity"]
+    max_num_generators = yml_config["event_generators"]["generators"]["max_quantity"]
     num_of_generators = random.randint(min_num_generators, max_num_generators)
 
-    event_on_edge_probability = config["event_generators"]["on_edge_probability"]
+    event_on_edge_probability = yml_config["event_generators"]["on_edge_probability"]
 
-    list_of_events = config["event_generators"]["events"]
-    generator_basename = config["event_generators"]["generator_base_name"]
+    list_of_events = yml_config["event_generators"]["events"]
+    generator_basename = yml_config["event_generators"]["generator_base_name"]
 
     for index in range(1, num_of_generators + 1):
 
-        min_num_events = config["event_generators"]["events_per_generator"][
+        min_num_events = yml_config["event_generators"]["events_per_generator"][
             "min_quantity"
         ]
-        max_num_events = config["event_generators"]["events_per_generator"][
+        max_num_events = yml_config["event_generators"]["events_per_generator"][
             "max_quantity"
         ]
         num_of_events = random.randint(min_num_events, max_num_events)
@@ -210,7 +218,7 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
 
     # services
     services: dict[str, Service] = {}
-    config_services = config["services"]
+    config_services = yml_config["services"]
     index = 0
 
     for category in ["cloud", "fog", "edge"]:
@@ -234,6 +242,7 @@ def generate_infrastructure(config_filename: str) -> PhysicalInfrastructure:
                 services[service_id] = service_obj
 
     """
+    from matplotlib import pyplot
     # plot the graph
     color_map = []
     for node in graph:

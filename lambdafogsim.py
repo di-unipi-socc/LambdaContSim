@@ -1,4 +1,4 @@
-import sys
+import argparse
 import json
 from application.application import Application, ApplicationState
 from application.placed_function import FunctionState
@@ -38,18 +38,29 @@ node_stats: dict[str, dict] = {}
 link_events: list = []
 
 
-def print_usage():
-    """Print application usage message"""
-    print("Usage: %s [<options>]" % os.path.basename(sys.argv[0]))
-    print(
-        "       %s [-h|--help] to show this help message"
-        % os.path.basename(sys.argv[0])
+def get_parser() -> argparse.ArgumentParser :
+
+    parser = argparse.ArgumentParser(
+        description="Simulation with LambdaFogSim"
     )
-    print("\nOptions:")
-    print("-c <config file> simulator config (default config.yaml)")
-    print(
-        "-i <infrastructure config file> physical infrastructure config (default infrastructure_config.yaml)"
+
+    parser.add_argument(
+        "-c", "--config",
+        type=str,
+        default=gc.DEFAULT_CONFIG_PATH,
+        help="simulator config (default config.yaml)",
+        dest='config'
     )
+
+    parser.add_argument(
+        "-i", "--infrastructure",
+        type=str,
+        default=gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH,
+        help="physical infrastructure config (default infrastructure_config.yaml)",
+        dest='infrastructure_config'
+    )
+
+    return parser
 
 
 def place_application(
@@ -811,7 +822,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
 
 # Entry point of the simulator
-def main(argv):
+def main():
 
     # INITIALIZATION PHASE - Global variables
 
@@ -820,79 +831,21 @@ def main(argv):
     # logging
     logger = logs.init_logger()
 
-    # configuration file path, set to default
-    config_path = gc.DEFAULT_CONFIG_PATH
-    # infrastructure configuration file path, set to default
-    infrastructure_config_path = gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH
-    # infrastructure config file has given
-    infrastructure_given = False
-
-    # if the user use ask for help, print application usage message
-    if "-h" in argv or "--help" in argv:
-        print_usage()
-        return 0
-
-    # parse command line arguments
-    for i in range(0, len(argv) - 1, 2):
-        option: str = argv[i]
-        option_value = argv[i + 1]
-
-        if not option.startswith("-"):
-            logger.error("Invalid: %s is not an option", option)
-            continue
-
-        match option:
-            case "-c":
-                config_path = option_value
-            case "-i":
-                infrastructure_config_path = option_value
-                infrastructure_given = True
-            case _:
-                # unknown option
-                logger.info("Unknown %s option", option)
+    # parse arguments
+    parser = get_parser()
+    args = parser.parse_args()
 
     # check if the given config path is a file
-    if not os.path.exists(config_path) or not os.path.isfile(config_path):
-        logger.error("Config path '%s' not exists or is not a file" % config_path)
-        logger.info("Fallback to default config file %s" % gc.DEFAULT_CONFIG_PATH)
-        config_path = gc.DEFAULT_CONFIG_PATH
-        # check that the default config exists
-        if not os.path.exists(config_path) or not os.path.isfile(config_path):
-            logger.critical(
-                "Default config path '%s' not exists or is not a file, exit..."
-                % config_path
-            )
-            print_usage()
-            return 1
-
-    if infrastructure_given:
-        # check if the given infrastructure config path is a file
-        if not os.path.exists(infrastructure_config_path) or not os.path.isfile(
-            infrastructure_config_path
-        ):
-            logger.error(
-                f"Infrastructure config path {infrastructure_config_path} not exists or is not a file"
-            )
-            logger.info(
-                f"Fallback to default config file {gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH}"
-            )
-            infrastructure_config_path = gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH
-            # check that the default config exists
-            if not os.path.exists(infrastructure_config_path) or not os.path.isfile(
-                infrastructure_config_path
-            ):
-                logger.critical(
-                    f"Default config path {infrastructure_config_path} not exists or is not a file, exit..."
-                )
-                print_usage()
-                return 1
+    if not os.path.exists(args.config) or not os.path.isfile(args.config):
+        logger.error("Config path '%s' not exists or is not a file" % args.config)
+        parser.print_help()
+        return 1
 
     # parse the config file
-    parsing_succeed = parse_config(config_path)
+    parsing_succeed = parse_config(args.config)
 
     if not parsing_succeed:
         logger.critical("Config parsing failed")
-        print_usage()
         return 1
 
     logger.info("Config correctly parsed")
@@ -914,8 +867,22 @@ def main(argv):
     if config.infr_type == "physical":
         logger.info("Infrastructure generation is starting")
 
+        # check if the given infrastructure config path is a file
+        if not os.path.exists(args.infrastructure_config) or not os.path.isfile(
+            args.infrastructure_config
+        ):
+            logger.error(
+                f"Infrastructure config path '{args.infrastructure_config}' not exists or is not a file"
+            )
+            parser.print_help()
+            return 1
+
         # randomly generate the infrastructure
-        infrastructure = generate_infrastructure(infrastructure_config_path)
+        infrastructure = generate_infrastructure(args.infrastructure_config)
+
+        if not infrastructure:
+            logger.critical("Infrastructure generation failed...")
+            return 1
 
         # save infrastructure file into default path
         dump_infrastructure(infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
@@ -1132,4 +1099,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
