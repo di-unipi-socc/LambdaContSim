@@ -2,7 +2,7 @@ import random
 import yaml
 import networkx as nx
 from infrastructure.event_generator import EventGenerator
-from infrastructure.node import Node
+from infrastructure.node import Node, NodeCategory
 from math import inf
 from infrastructure.infrastructure import Infrastructure, LinkInfo
 from infrastructure.physical_infrastructure import PhysicalInfrastructure
@@ -241,24 +241,6 @@ def generate_infrastructure(config_filename: str):
                 )
                 services[service_id] = service_obj
 
-    """
-    from matplotlib import pyplot
-    # plot the graph
-    color_map = []
-    for node in graph:
-        node_str = str(node)
-        if node_str.startswith('cloud'):
-            color_map.append('orange')
-        elif node_str.startswith('fog'):
-            color_map.append('yellow')
-        else:
-            color_map.append('purple')
-
-    pos = nx.spring_layout(graph, scale=20, k=3/numpy.sqrt(graph.order()))
-    nx.draw(graph, pos = pos, font_size = 10, node_color = color_map, with_labels = True, node_size=1100)
-    pyplot.show()
-    """
-
     nodes_dict: dict[str, Node] = {}
 
     for category in ["edge", "fog", "cloud"]:
@@ -371,3 +353,28 @@ def dump_infrastructure(infrastructure: Infrastructure, output_filename: str):
     with open(output_filename, "w") as file:
         for line in lines:
             file.write(line + "\n")
+
+
+def plot_infrastructure(infrastructure: Infrastructure):
+    """Plot infrastructure graph with pyplot"""
+    from matplotlib import pyplot
+    import numpy
+    
+    graph = infrastructure.graph
+    
+    # plot the graph
+    color_map = []
+    for node_id in graph:
+        node_category = infrastructure.nodes[node_id].category
+        match node_category:
+            case NodeCategory.CLOUD:
+                color_map.append('#36AE7C')
+            case NodeCategory.FOG:
+                color_map.append('#F9D923')
+            case NodeCategory.EDGE:
+                color_map.append('#EB5353')
+
+    pos = nx.spring_layout(graph, scale=20, k=3/numpy.sqrt(graph.order()))
+    nx.draw(graph, pos = pos, font_size = 9, node_color = color_map, with_labels = True, node_size=1200)
+    pyplot.show(block=True)
+    pyplot.close()

@@ -900,6 +900,11 @@ def main():
         # save infrastructure file into default path
         shutil.copy(config.infr_logical_filename, gc.SECF2F_INFRASTRUCTURE_PATH)
 
+    # plot infrastructure graph
+    if False:
+        from infrastructure.utils import plot_infrastructure
+        plot_infrastructure(infrastructure)
+
     # initialize node stats dictionary
     for node_id in infrastructure.nodes:
         node_stats[node_id] = {}
