@@ -35,5 +35,9 @@ To run the simulator you have to open a terminal and execute the following comma
 
 `-c, --config <configuration file>` define your own configuration file. Default is `config.py`
 
-`-i, --infrastructure <infrastructure configuration file>` define your own physical infrastructure config file. Default is `infrastructure_config.yaml`
+`-p, --physical <infrastructure configuration file>` define your own physical infrastructure config file. Default is `infrastructure_config.yaml`
+
+`-l, --logical <Prolog infrastructure file>` logical infrastructure config file
+
+`Note` -p and -l options are mutually exclusive
 

@@ -51,13 +51,25 @@ def get_parser() -> argparse.ArgumentParser:
         dest="config",
     )
 
-    parser.add_argument(
-        "-i",
-        "--infrastructure",
+    # Physical and logical infrastructure are mutually exclusive
+    action = parser.add_mutually_exclusive_group()
+
+    action.add_argument(
+        "-p",
+        "--physical",
         type=str,
         default=gc.DEFAULT_INFRASTRUCTURE_CONFIG_PATH,
         help="physical infrastructure config (default infrastructure_config.yaml)",
-        dest="infrastructure_config",
+        dest="physical_infrastructure",
+    )
+
+    action.add_argument(
+        "-l",
+        "--logical",
+        type=str,
+        default=None,
+        help="logical infrastructure Prolog definition",
+        dest="logical_infrastructure",
     )
 
     return parser
@@ -867,18 +879,18 @@ def main():
     if config.infr_type == "physical":
         logger.info("Infrastructure generation is starting")
 
-        # check if the given infrastructure config path is a file
-        if not os.path.exists(args.infrastructure_config) or not os.path.isfile(
-            args.infrastructure_config
+        # check if the given physical infrastructure config path is a file
+        if not os.path.exists(args.physical_infrastructure) or not os.path.isfile(
+            args.physical_infrastructure
         ):
             logger.error(
-                f"Infrastructure config path '{args.infrastructure_config}' not exists or is not a file"
+                f"Physical infrastructure config path '{args.physical_infrastructure}' not exists or is not a file"
             )
             parser.print_help()
             return 1
 
         # randomly generate the infrastructure
-        infrastructure = generate_infrastructure(args.infrastructure_config)
+        infrastructure = generate_infrastructure(args.physical_infrastructure)
 
         if not infrastructure:
             logger.critical("Infrastructure generation failed...")
@@ -894,11 +906,34 @@ def main():
 
     else:
 
+        if not args.logical_infrastructure:
+            logger.critical("If infrastructure type is 'logical', a valid infrastructure file must be given")
+            parser.print_help()
+            return 1
+
+        # check if the given logical infrastructure path is a file
+        if not os.path.exists(args.logical_infrastructure) or not os.path.isfile(
+            args.logical_infrastructure
+        ):
+            logger.error(
+                f"Logical infrastructure path '{args.logical_infrastructure}' not exists or is not a file"
+            )
+            parser.print_help()
+            return 1
+        
+        # check if the given logical infrastructure path has .pl
+        if str(args.logical_infrastructure).split(".")[-1].lower() != "pl":
+            logger.error(
+                f"Logical infrastructure path '{args.logical_infrastructure}' is not a Prolog file"
+            )
+            parser.print_help()
+            return 1
+
         # load infrastructure from the Prolog file
-        infrastructure = LogicalInfrastructure.loads(config.infr_logical_filename)
+        infrastructure = LogicalInfrastructure.loads(args.logical_infrastructure)
 
         # save infrastructure file into default path
-        shutil.copy(config.infr_logical_filename, gc.SECF2F_INFRASTRUCTURE_PATH)
+        shutil.copy(args.logical_infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
 
     # plot infrastructure graph
     if False:

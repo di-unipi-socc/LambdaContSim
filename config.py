@@ -29,7 +29,6 @@ def parse_config(path):
 
     # INFRASTRUCTURE
     global infr_type
-    global infr_logical_filename
     global infr_is_dynamic
     global infr_node_crash_probability
     global infr_node_resurrection_probability
@@ -147,21 +146,6 @@ def parse_config(path):
             "Only allowed value for infrastructure type are 'physical' and 'logical'"
         )
         return False
-
-    # if the infrastructur is logical, we need to take it from a Prolog file
-    if infr_type == "logical":
-        infr_temp_filename = str(yml_config["infrastructure"]["logical_filename"])
-        infr_logical_filename = os.path.join(
-            gc.INFRASTRUCTURES_PATH, infr_temp_filename
-        )
-
-        if not os.path.isfile(infr_logical_filename):
-            logger.error(
-                "If infrastructure type is 'logical', a valid infrastructure file must be given"
-            )
-            return False
-    else:
-        infr_logical_filename = ""
 
     infr_is_dynamic = bool(yml_config["infrastructure"]["is_dynamic"])
 

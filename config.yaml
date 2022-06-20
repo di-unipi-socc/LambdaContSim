@@ -14,7 +14,6 @@ events:
 
 infrastructure:
   type: physical # allowed values are 'logical' and 'physical'
-  logical_filename: simple_infrastructure.pl
   is_dynamic: true # nodes and links can crash iff the infrastructure is dynamic
   crash_probability :
     cloud : 0.001
