@@ -119,10 +119,9 @@ nodes:
         v_cpu: 4
         mhz: 3000
 
-latencies:
+links:
   cloud:
-    cloud:
-      link_probability: 1
+    self:
       lower: 30
       upper: 55
     fog:
@@ -134,8 +133,7 @@ latencies:
       lower: 35
       upper: 45
   fog:
-    fog:
-      link_probability: 1
+    self:
       lower: 5
       upper: 27
     edge:
@@ -143,8 +141,7 @@ latencies:
       lower: 5
       upper: 21
   edge:
-    edge:
-      link_probability: 1
+    self:
       lower: 2
       upper: 15
 

@@ -88,8 +88,8 @@ def generate_infrastructure(config_filename: str):
     edges = []
     for category in ["cloud", "fog", "edge"]:
 
-        lower_latency = yml_config["latencies"][category][category]["lower"]
-        upper_latency = yml_config["latencies"][category][category]["upper"]
+        lower_latency = yml_config["links"][category]["self"]["lower"]
+        upper_latency = yml_config["links"][category]["self"]["upper"]
 
         category_nodes = nodes_by_category[category]
         for index in range(0, len(category_nodes) - 1):
@@ -107,7 +107,7 @@ def generate_infrastructure(config_filename: str):
 
         category_nodes: list[Node] = nodes_by_category[category]
 
-        latencies = yml_config["latencies"]["cloud"][category]
+        latencies = yml_config["links"]["cloud"][category]
         link_probability = latencies["link_probability"]
         lower_latency = latencies["lower"]
         upper_latency = latencies["upper"]
@@ -136,7 +136,7 @@ def generate_infrastructure(config_filename: str):
 
         category_nodes: list[Node] = nodes_by_category[category]
 
-        latencies = yml_config["latencies"]["fog"][category]
+        latencies = yml_config["links"]["fog"][category]
         link_probability = latencies["link_probability"]
         lower_latency = latencies["lower"]
         upper_latency = latencies["upper"]
