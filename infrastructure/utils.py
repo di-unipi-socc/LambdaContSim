@@ -108,14 +108,14 @@ def generate_infrastructure(config_filename: str):
         category_nodes: list[Node] = nodes_by_category[category]
 
         latencies = yml_config["latencies"]["cloud"][category]
-        edge_probability = latencies["edge_probability"]
+        link_probability = latencies["link_probability"]
         lower_latency = latencies["lower"]
         upper_latency = latencies["upper"]
 
         for cloud_node in cloud_nodes:
             almost_one_connected = False
             for category_node in category_nodes:
-                are_connected = random.random() < edge_probability
+                are_connected = random.random() < link_probability
                 if are_connected:
                     almost_one_connected = True
                     distance = random.randint(lower_latency, upper_latency)
@@ -137,14 +137,14 @@ def generate_infrastructure(config_filename: str):
         category_nodes: list[Node] = nodes_by_category[category]
 
         latencies = yml_config["latencies"]["fog"][category]
-        edge_probability = latencies["edge_probability"]
+        link_probability = latencies["link_probability"]
         lower_latency = latencies["lower"]
         upper_latency = latencies["upper"]
 
         for fog_node in fog_nodes:
             almost_one_connected = False
             for category_node in category_nodes:
-                are_connected = random.random() < edge_probability
+                are_connected = random.random() < link_probability
                 if are_connected:
                     almost_one_connected = True
                     distance = random.randint(lower_latency, upper_latency)
