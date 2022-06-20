@@ -907,7 +907,9 @@ def main():
     else:
 
         if not args.logical_infrastructure:
-            logger.critical("If infrastructure type is 'logical', a valid infrastructure file must be given")
+            logger.critical(
+                "If infrastructure type is 'logical', a valid infrastructure file must be given"
+            )
             parser.print_help()
             return 1
 
@@ -920,7 +922,7 @@ def main():
             )
             parser.print_help()
             return 1
-        
+
         # check if the given logical infrastructure path has .pl
         if str(args.logical_infrastructure).split(".")[-1].lower() != "pl":
             logger.error(
@@ -938,6 +940,7 @@ def main():
     # plot infrastructure graph
     if False:
         from infrastructure.utils import plot_infrastructure
+
         plot_infrastructure(infrastructure)
 
     # initialize node stats dictionary

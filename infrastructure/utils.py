@@ -359,22 +359,29 @@ def plot_infrastructure(infrastructure: Infrastructure):
     """Plot infrastructure graph with pyplot"""
     from matplotlib import pyplot
     import numpy
-    
+
     graph = infrastructure.graph
-    
+
     # plot the graph
     color_map = []
     for node_id in graph:
         node_category = infrastructure.nodes[node_id].category
         match node_category:
             case NodeCategory.CLOUD:
-                color_map.append('#36AE7C')
+                color_map.append("#36AE7C")
             case NodeCategory.FOG:
-                color_map.append('#F9D923')
+                color_map.append("#F9D923")
             case NodeCategory.EDGE:
-                color_map.append('#EB5353')
+                color_map.append("#EB5353")
 
-    pos = nx.spring_layout(graph, scale=20, k=3/numpy.sqrt(graph.order()))
-    nx.draw(graph, pos = pos, font_size = 9, node_color = color_map, with_labels = True, node_size=1200)
+    pos = nx.spring_layout(graph, scale=20, k=3 / numpy.sqrt(graph.order()))
+    nx.draw(
+        graph,
+        pos=pos,
+        font_size=9,
+        node_color=color_map,
+        with_labels=True,
+        node_size=1200,
+    )
     pyplot.show(block=True)
     pyplot.close()
