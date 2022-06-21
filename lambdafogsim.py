@@ -558,8 +558,14 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                     link_crashed_second_node,
                                 ):
                                     interested_functions.add(placed_function.id)
+                                    
+                                    # also previous functions deployed on node_x are interested
+                                    function_dependencies = application_obj.original_chain[placed_function.id]
+                                    for function_id in function_dependencies:
+                                        if application_obj.placement[function_id].node_id == node_x:
+                                            interested_functions.add(function_id)
+                                    
                                     option1_verified = True
-                                    break
 
                         # Option 2
                         # check only if option 1 is not verified
