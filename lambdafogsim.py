@@ -44,6 +44,14 @@ def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Simulation with LambdaFogSim")
 
     parser.add_argument(
+        "-v",
+        "--verbose",
+        help="increase simulator verbosity",
+        action="store_true",
+        dest="verbose",
+    )
+
+    parser.add_argument(
         "-c",
         "--config",
         type=str,
@@ -933,6 +941,13 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
+    # if verbose mode is active show all logging messages
+    if args.verbose:
+        import logging
+
+        logger.info("Verbose mode is now active, only errors will be shown")
+        logger.setLevel(logging.INFO)
+
     # check if the given config path is a file
     if not os.path.exists(args.config) or not os.path.isfile(args.config):
         logger.error("Config path '%s' not exists or is not a file" % args.config)
@@ -947,13 +962,6 @@ def main():
         return 1
 
     logger.info("Config correctly parsed")
-
-    # if silent mode is active don't show info messages but only errors and criticals
-    if config.sim_silent_mode:
-        import logging
-
-        logger.info("Silent mode is now active, only errors will be shown")
-        logger.setLevel(logging.ERROR)
 
     # Seed for deterministic execution
     random.seed(config.sim_seed)

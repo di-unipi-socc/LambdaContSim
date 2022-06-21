@@ -15,7 +15,6 @@ def parse_config(path):
 
     # SIMULATOR
     global sim_report_output_file
-    global sim_silent_mode
     global sim_num_of_epochs
     global sim_function_duration
     global sim_seed
@@ -57,7 +56,6 @@ def parse_config(path):
 
     # SIMULATOR
 
-    sim_silent_mode = bool(yml_config["simulator"]["silent_mode"])
     sim_num_of_epochs = int(yml_config["simulator"]["epochs"])
     sim_function_duration = int(yml_config["simulator"]["function_duration"])
 

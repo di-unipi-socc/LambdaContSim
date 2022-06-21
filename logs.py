@@ -2,6 +2,7 @@ import logging
 
 
 def init_logger():
+    """Init logger with error level"""
 
     # format the logging message
     # TIME - LOG LEVEL : message to print
@@ -11,7 +12,7 @@ def init_logger():
     logger = logging.getLogger()
 
     # Setting the threshold of logger to INFO
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.ERROR)
 
     return logger
 

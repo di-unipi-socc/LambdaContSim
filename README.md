@@ -33,6 +33,8 @@ To run the simulator you have to open a terminal and execute the following comma
 
 ### Options
 
+`-v, --verbose` verbose mode
+
 `-c, --config <configuration file>` define your own configuration file. Default is `config.py`
 
 `-p, --physical <infrastructure configuration file>` define your own physical infrastructure config file. Default is `infrastructure_config.yaml`
