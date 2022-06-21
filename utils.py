@@ -1,17 +1,19 @@
 """Utils functions"""
 
 
+from application.placed_function import FunctionState, PlacedFunction
+
+
 def get_ready_functions(application_chain: dict) -> list[str]:
     """
     Returns the list of ready functions.
     A ready function is a function without dependencies
     """
-
     to_return = []
     functions = application_chain.keys()
     for fun in functions:
-        dependencies = application_chain.get(fun)
-        if len(dependencies) == 0 or None in dependencies:
+        dependencies = application_chain[fun]
+        if not dependencies or None in dependencies:
             to_return.append(fun)
 
     return to_return
@@ -88,6 +90,24 @@ def get_recursive_dependents(function_id: str, application_chain: dict) -> list:
     return list(set(to_return))
 
 
+def get_recursive_waiting_dependencies(
+    function_id: str,
+    application_chain: dict[str, list],
+    placement: dict[str, PlacedFunction],
+    to_return: set
+):
+    """
+    Returns set of function_id's dependency functions which are interested by function_id crash
+    """
+    function_obj = placement[function_id]
+    # if the function is not waiting, then its dependencies already finished
+    if function_obj.state == FunctionState.WAITING:
+        function_dependencies = application_chain[function_id]
+        for dependency_id in function_dependencies:
+            to_return.add(dependency_id)
+            get_recursive_waiting_dependencies(dependency_id, application_chain, placement, to_return)
+
+
 def find_functions_level(result: dict, function: str, chain: dict, level: int = 0):
     """
     Find for each function in the chain its level of execution
@@ -140,17 +160,27 @@ def get_oldest(interested_functions: list, original_chain: dict[str, list]):
             # get dependent functions from the oldest
             oldest_dependents = get_recursive_dependents(oldest, original_chain)
 
-            # if all functions are dependants of the oldest, then we finished
             found = True
-            for function in interested_functions:
-                if function == oldest:
-                    continue
-                if function not in oldest_dependents:
-                    found = False
-                    break
+
+            # if a dependent of the 'oldest' has other dependencies which are not in oldest_dependents
+            # then we have to change oldest
+            for dependent in oldest_dependents:
+                dependent_dependencies = original_chain[dependent]
+                for node in dependent_dependencies:
+                    if node != oldest and node not in oldest_dependents:
+                        found = False
 
             if found:
-                return oldest
+                # if all functions are dependants of the oldest, then we finished
+                for function in interested_functions:
+                    if function == oldest:
+                        continue
+                    if function not in oldest_dependents:
+                        found = False
+                        break
+
+                if found:
+                    return oldest
 
         # search a new oldest by downgrading the level
         # we are sure that, at most, the function at level 0 will be the oldest

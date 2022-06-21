@@ -24,6 +24,7 @@ import global_constants as gc
 from utils import (
     get_ready_functions,
     get_recursive_dependents,
+    get_recursive_waiting_dependencies,
     is_edge_part,
     take_decision,
     get_oldest,
@@ -516,6 +517,21 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                             # Option 1: is the function deployed in a crashed node?
                             if placed_function.node_id in crashed_nodes:
                                 interested_functions.add(placed_function.id)
+
+                                # if the function is waiting
+                                if placed_function.state == FunctionState.WAITING:
+
+                                    # also its dependency functions are interested
+                                    result = set()
+                                    get_recursive_waiting_dependencies(
+                                        placed_function.id,
+                                        application_obj.chain,
+                                        application_obj.placement,
+                                        result,
+                                    )
+                                    for function_id in result:
+                                        interested_functions.add(function_id)
+
                                 node_crash_verified = True
                             else:
                                 # Option 2: is one of its services deployed in a crashed node?
@@ -523,6 +539,21 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                     service = infrastructure.services[service_id]
                                     if service.deployed_node in crashed_nodes:
                                         interested_functions.add(placed_function.id)
+                                        
+                                        # if the function is waiting
+                                        if placed_function.state == FunctionState.WAITING:
+
+                                            # also its dependency functions are interested
+                                            result = set()
+                                            get_recursive_waiting_dependencies(
+                                                placed_function.id,
+                                                application_obj.chain,
+                                                application_obj.placement,
+                                                result,
+                                            )
+                                            for function_id in result:
+                                                interested_functions.add(function_id)
+
                                         node_crash_verified = True
                                         break
 
@@ -559,13 +590,20 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                 ):
                                     interested_functions.add(placed_function.id)
                                     
-                                    # also previous functions deployed on node_x are interested
-                                    function_dependencies = application_obj.original_chain[placed_function.id]
-                                    for function_id in function_dependencies:
-                                        if application_obj.placement[function_id].node_id == node_x:
-                                            interested_functions.add(function_id)
+                                    # also its dependency functions are interested
+                                    result = set()
+                                    get_recursive_waiting_dependencies(
+                                        placed_function.id,
+                                        application_obj.chain,
+                                        application_obj.placement,
+                                        result,
+                                    )
+                                    for function_id in result:
+                                        interested_functions.add(function_id)
                                     
                                     option1_verified = True
+
+                                    break
 
                         # Option 2
                         # check only if option 1 is not verified
@@ -587,6 +625,21 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                                     link_crashed_second_node,
                                 ):
                                     interested_functions.add(placed_function.id)
+
+                                    # if the function is waiting
+                                    if placed_function.state == FunctionState.WAITING:
+
+                                        # also its dependency functions are interested
+                                        result = set()
+                                        get_recursive_waiting_dependencies(
+                                            placed_function.id,
+                                            application_obj.chain,
+                                            application_obj.placement,
+                                            result,
+                                        )
+                                        for function_id in result:
+                                            interested_functions.add(function_id)
+
                                     break
 
                 # if there is interested functions then application needs to be partially replaced
@@ -602,14 +655,18 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
                     # get the list of function which depends by start_function
                     dependent_functions = get_recursive_dependents(
-                        start_function, application_obj.chain
+                        start_function, application_obj.original_chain
                     )
 
                     functions_to_be_released = [start_function] + dependent_functions
 
-                    # release all resources of start function and its dependents
+                    # release all resources of start function and its dependents, if they are running or waiting
                     for function_name in functions_to_be_released:
                         function = application_obj.placement[function_name]
+
+                        if function.state not in [FunctionState.RUNNING, FunctionState.WAITING]:
+                            continue
+
                         node_id = function.node_id
                         node_obj = application_obj.infrastructure_nodes[node_id]
                         node_obj.release_resources(function.memory, function.v_cpu)
@@ -664,6 +721,11 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                         # update the application chain with the new placement
                         functions = replaced_application_chain.keys()
                         for function in functions:
+                            
+                            # already completed functions don't have the key inside the chain
+                            if function not in application_obj.chain:
+                                application_obj.chain[function] = []
+                            
                             for dependent_function in replaced_application_chain[
                                 function
                             ]:

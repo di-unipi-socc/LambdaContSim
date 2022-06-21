@@ -303,7 +303,7 @@ def unpack_nested_tuples(t: tuple):
     return to_return
 
 
-def build_app_chain(prolog_placement: dict) -> dict[str, str]:
+def build_app_chain(prolog_placement: dict) -> dict[str, list]:
 
     dependencies = {}
 
