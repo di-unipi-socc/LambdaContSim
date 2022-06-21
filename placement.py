@@ -132,7 +132,7 @@ def get_raw_placement(
                 query_result = prolog_thread.query(query)
 
             except PrologError as error:
-                logger.error(f"Prolog execution failed: {str(error)}")
+                logger.error(f"SecFaaS2Fog query execution failed: {str(error)}")
 
             finally:
                 # save SecFaaS2Fog finish time

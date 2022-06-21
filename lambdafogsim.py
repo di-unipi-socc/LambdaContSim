@@ -696,26 +696,44 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                         start_function
                     ].previous_nodes
 
-                    # search for a new placement
+                    # application can't be replaced if almost one of the starting nodes is down
+                    replacement_can_start = True
 
-                    # save application file into default path
-                    application_path = os.path.join(
-                        gc.APPLICATIONS_PATH, application_obj.filename
-                    )
-                    shutil.copy(application_path, gc.SECF2F_APP_PATH)
+                    for node_id in starting_nodes:
+                        if node_id in infrastructure.crashed_nodes:
+                            logger.info(
+                                "Replacement will not start because one of the starting node is crashed"
+                            )
+                            replacement_can_start = False
+                            break
 
-                    (
-                        is_successfully_replaced,
-                        replaced_application_chain,
-                    ) = replace_application(
-                        application_obj,
-                        start_function,
-                        starting_nodes,
-                        crashed_nodes,
-                        list(crashed_link) if crashed_link else [],
-                        infrastructure,
-                        step_number,
-                    )
+                    if not replacement_can_start:
+                        (
+                            is_successfully_replaced,
+                            replaced_application_chain,
+                        ) = False, None
+
+                    else:
+                        # search for a new placement
+
+                        # save application file into default path
+                        application_path = os.path.join(
+                            gc.APPLICATIONS_PATH, application_obj.filename
+                        )
+                        shutil.copy(application_path, gc.SECF2F_APP_PATH)
+
+                        (
+                            is_successfully_replaced,
+                            replaced_application_chain,
+                        ) = replace_application(
+                            application_obj,
+                            start_function,
+                            starting_nodes,
+                            crashed_nodes,
+                            list(crashed_link) if crashed_link else [],
+                            infrastructure,
+                            step_number,
+                        )
 
                     if is_successfully_replaced:
                         # update the application chain with the new placement
