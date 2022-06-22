@@ -726,7 +726,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
 
                         # save application file into default path
                         application_path = os.path.join(
-                            gc.APPLICATIONS_PATH, application_obj.filename
+                            gc.APPLICATIONS_DIR, application_obj.filename
                         )
                         shutil.copy(application_path, gc.SECF2F_APP_PATH)
 
@@ -866,7 +866,7 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                         # get application path
                         application_filename = config_application["filename"]
                         application_path = os.path.join(
-                            gc.APPLICATIONS_PATH, application_filename
+                            gc.APPLICATIONS_DIR, application_filename
                         )
 
                         # save application file into default path

@@ -28,8 +28,8 @@ virtualenv -p python3 venv && source venv/bin/activate && pip install -r require
 
 ### Run the simulator
 
-To run the simulator you have to open a terminal and execute the following command:
-`python3 lambdafogsim.py`
+Inside the project root run the simulator with the following command:
+`python3 src/lambdafogsim.py`
 
 ### Options
 

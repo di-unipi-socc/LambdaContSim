@@ -75,11 +75,10 @@ def parse_config(path):
     file_prefix = "report" if temp_file_prefix == "" else temp_file_prefix
     datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     file_basename = file_prefix + " " + datetime_str + ".json"
-    report_folder_path = os.path.join(os.getcwd(), "reports")
-    file_path = os.path.join(report_folder_path, file_basename)
+    file_path = os.path.join(gc.REPORT_DIR, file_basename)
 
     # create report folder if it doesn't exist
-    os.makedirs(report_folder_path, exist_ok=True)
+    os.makedirs(gc.REPORT_DIR, exist_ok=True)
 
     sim_report_output_file = file_path
 
@@ -198,7 +197,7 @@ def parse_config(path):
     for app_name in applications:
         app = applications[app_name]
         application_filename = app["filename"]
-        application_path = os.path.join(gc.APPLICATIONS_PATH, application_filename)
+        application_path = os.path.join(gc.APPLICATIONS_DIR, application_filename)
         if not os.path.isfile(application_path):
             logger.error(f"{app_name} application path is not a file")
             return False
