@@ -27,7 +27,7 @@ from utils import (
     get_recursive_waiting_dependencies,
     is_edge_part,
     take_decision,
-    get_oldest,
+    get_starting_function,
 )
 import random
 
@@ -656,9 +656,11 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
                         "Application %s needs a partial replacement", application_obj.id
                     )
 
-                    # find the oldest relative among them
-                    start_function = get_oldest(
-                        list(interested_functions), application_obj.original_chain
+                    # find the starting function
+                    start_function = get_starting_function(
+                        list(interested_functions),
+                        application_obj.original_chain,
+                        application_obj.placement
                     )
 
                     # get the list of function which depends by start_function
