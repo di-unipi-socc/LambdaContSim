@@ -1,6 +1,5 @@
 simulator:
-  output_file_prefix : 'report'
-  epochs : 1000
+  epochs : 100
   function_duration : 1
   seed : 100 # if seed is -1 then a cryptographically strong one will be generated
   use_padding : true

@@ -69,12 +69,9 @@ def parse_config(path):
     sim_use_padding = bool(yml_config["simulator"]["use_padding"])
     sim_max_placement_time = int(yml_config["simulator"]["max_placement_time"])
 
-    temp_file_prefix = str(yml_config["simulator"]["output_file_prefix"])
-
     # file prefix is 'report' if the used doesn't write it
-    file_prefix = "report" if temp_file_prefix == "" else temp_file_prefix
     datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    file_basename = file_prefix + " " + datetime_str + ".json"
+    file_basename = "report " + datetime_str + ".json"
     file_path = os.path.join(gc.REPORT_DIR, file_basename)
 
     # create report folder if it doesn't exist
