@@ -11,7 +11,7 @@ def init_logger():
     # Creating an object
     logger = logging.getLogger()
 
-    # Setting the threshold of logger to INFO
+    # Setting the threshold of logger to ERROR
     logger.setLevel(logging.ERROR)
 
     return logger

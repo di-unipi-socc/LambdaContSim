@@ -929,132 +929,11 @@ def simulation(env: simpy.Environment, steps: int, infrastructure: Infrastructur
         yield env.timeout(1)
 
 
-# Entry point of the simulator
-def main():
-
-    # INITIALIZATION PHASE - Global variables
-
-    gc.init()
-
-    # logging
-    logger = logs.init_logger()
-
-    # parse arguments
-    parser = get_parser()
-    args = parser.parse_args()
-
-    # if verbose mode is active show all logging messages
-    if args.verbose:
-        import logging
-
-        logger.info("Verbose mode is now active, only errors will be shown")
-        logger.setLevel(logging.INFO)
-
-    # check if the given config path is a file
-    if not os.path.exists(args.config) or not os.path.isfile(args.config):
-        logger.error("Config path '%s' not exists or is not a file" % args.config)
-        parser.print_help()
-        return 1
-
-    # parse the config file
-    parsing_succeed = parse_config(args.config)
-
-    if not parsing_succeed:
-        logger.critical("Config parsing failed")
-        return 1
-
-    logger.info("Config correctly parsed")
-
-    # Seed for deterministic execution
-    random.seed(config.sim_seed)
-
-    # Instance infrastructure
-
-    infrastructure: Infrastructure
-
-    if config.infr_type == "physical":
-        logger.info("Infrastructure generation is starting")
-
-        # check if the given physical infrastructure config path is a file
-        if not os.path.exists(args.physical_infrastructure) or not os.path.isfile(
-            args.physical_infrastructure
-        ):
-            logger.error(
-                f"Physical infrastructure config path '{args.physical_infrastructure}' not exists or is not a file"
-            )
-            parser.print_help()
-            return 1
-
-        # randomly generate the infrastructure
-        infrastructure = generate_infrastructure(args.physical_infrastructure)
-
-        if not infrastructure:
-            logger.critical("Infrastructure generation failed...")
-            return 1
-
-        # save infrastructure file into default path
-        dump_infrastructure(infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
-
-        logger.info(
-            f"Infrastructure generated, it will be saved into {gc.GENERATED_INFRASTRUCTURE_PATH}"
-        )
-        shutil.copy(gc.SECF2F_INFRASTRUCTURE_PATH, gc.GENERATED_INFRASTRUCTURE_PATH)
-
-    else:
-
-        if not args.logical_infrastructure:
-            logger.critical(
-                "If infrastructure type is 'logical', a valid infrastructure file must be given"
-            )
-            parser.print_help()
-            return 1
-
-        # check if the given logical infrastructure path is a file
-        if not os.path.exists(args.logical_infrastructure) or not os.path.isfile(
-            args.logical_infrastructure
-        ):
-            logger.error(
-                f"Logical infrastructure path '{args.logical_infrastructure}' not exists or is not a file"
-            )
-            parser.print_help()
-            return 1
-
-        # check if the given logical infrastructure path has .pl
-        if str(args.logical_infrastructure).split(".")[-1].lower() != "pl":
-            logger.error(
-                f"Logical infrastructure path '{args.logical_infrastructure}' is not a Prolog file"
-            )
-            parser.print_help()
-            return 1
-
-        # load infrastructure from the Prolog file
-        infrastructure = LogicalInfrastructure.loads(args.logical_infrastructure)
-
-        # save infrastructure file into default path
-        shutil.copy(args.logical_infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
-
-    # plot infrastructure graph
-    if False:
-        from infrastructure.utils import plot_infrastructure
-
-        plot_infrastructure(infrastructure)
-
-    # initialize node stats dictionary
-    for node_id in infrastructure.nodes:
-        node_stats[node_id] = {}
-
-    # SIMPY PHASE
-
-    # Instance an enviroment
-    env = simpy.Environment()
-
-    # start simulation
-    env.process(simulation(env, config.sim_num_of_epochs, infrastructure))
-
-    # we simulate for sim_num_of_epochs epochs
-    env.run(until=config.sim_num_of_epochs)
-
-    # STATISTICS
+def print_stats():
+    """Print simulation stats into a report"""
+    
+    # get logger
+    logger = logs.get_logger()
 
     logger.info("--- STATISTICS ---")
 
@@ -1232,7 +1111,131 @@ def main():
     with open(config.sim_report_output_file, "w") as file:
         json.dump(stats_to_dump, indent=4, default=str, fp=file)
 
-    logger.info("Work done! Byee :)")
+
+# Entry point of the simulator
+def main():
+
+    # INITIALIZATION PHASE - Global variables
+
+    gc.init()
+
+    # logging
+    logger = logs.init_logger()
+
+    # parse arguments
+    parser = get_parser()
+    args = parser.parse_args()
+
+    # if verbose mode is active show all logging messages
+    if args.verbose:
+        import logging
+
+        logger.info("Verbose mode is now active, all messages will be shown")
+        logger.setLevel(logging.INFO)
+
+    # check if the given config path is a file
+    if not os.path.exists(args.config) or not os.path.isfile(args.config):
+        logger.error("Config path '%s' not exists or is not a file" % args.config)
+        parser.print_help()
+        return 1
+
+    # parse the config file
+    parsing_succeed = parse_config(args.config)
+
+    if not parsing_succeed:
+        logger.critical("Config parsing failed")
+        return 1
+
+    logger.info("Config correctly parsed")
+
+    # Seed for deterministic execution
+    random.seed(config.sim_seed)
+
+    # Instance infrastructure
+
+    infrastructure: Infrastructure
+
+    if config.infr_type == "physical":
+        logger.info("Infrastructure generation is starting")
+
+        # check if the given physical infrastructure config path is a file
+        if not os.path.exists(args.physical_infrastructure) or not os.path.isfile(
+            args.physical_infrastructure
+        ):
+            logger.error(
+                f"Physical infrastructure config path '{args.physical_infrastructure}' not exists or is not a file"
+            )
+            parser.print_help()
+            return 1
+
+        # randomly generate the infrastructure
+        infrastructure = generate_infrastructure(args.physical_infrastructure)
+
+        if not infrastructure:
+            logger.critical("Infrastructure generation failed...")
+            return 1
+
+        # save infrastructure file into default path
+        dump_infrastructure(infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
+
+        logger.info(
+            f"Infrastructure generated, it will be saved into {gc.GENERATED_INFRASTRUCTURE_PATH}"
+        )
+        shutil.copy(gc.SECF2F_INFRASTRUCTURE_PATH, gc.GENERATED_INFRASTRUCTURE_PATH)
+
+    else:
+
+        if not args.logical_infrastructure:
+            logger.critical(
+                "If infrastructure type is 'logical', a valid infrastructure file must be given"
+            )
+            parser.print_help()
+            return 1
+
+        # check if the given logical infrastructure path is a file
+        if not os.path.exists(args.logical_infrastructure) or not os.path.isfile(
+            args.logical_infrastructure
+        ):
+            logger.error(
+                f"Logical infrastructure path '{args.logical_infrastructure}' not exists or is not a file"
+            )
+            parser.print_help()
+            return 1
+
+        # check if the given logical infrastructure path has .pl
+        if str(args.logical_infrastructure).split(".")[-1].lower() != "pl":
+            logger.error(
+                f"Logical infrastructure path '{args.logical_infrastructure}' is not a Prolog file"
+            )
+            parser.print_help()
+            return 1
+
+        # load infrastructure from the Prolog file
+        infrastructure = LogicalInfrastructure.loads(args.logical_infrastructure)
+
+        # save infrastructure file into default path
+        shutil.copy(args.logical_infrastructure, gc.SECF2F_INFRASTRUCTURE_PATH)
+
+    # initialize node stats dictionary
+    for node_id in infrastructure.nodes:
+        node_stats[node_id] = {}
+
+    # SIMPY PHASE
+
+    # Instance an enviroment
+    env = simpy.Environment()
+
+    # start simulation
+    env.process(simulation(env, config.sim_num_of_epochs, infrastructure))
+
+    # we simulate for sim_num_of_epochs epochs
+    env.run(until=config.sim_num_of_epochs)
+
+    # STATISTICS
+
+    print_stats()
+
+    logger.info("Simulation done! Byee :)")
 
     return 0
 
