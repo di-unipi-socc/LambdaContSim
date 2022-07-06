@@ -1,0 +1,5 @@
+[submodule "SecFaaS2Fog"]
+	path = SecFaaS2Fog
+	url = https://github.com/di-unipi-socc/SecFaaS2Fog
+	branch = main
+	ignore = dirty
