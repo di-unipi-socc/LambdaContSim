@@ -175,7 +175,7 @@ def generate_infrastructure(config_filename: str):
 
     event_on_edge_probability = yml_config["event_generators"]["on_edge_probability"]
 
-    list_of_events = yml_config["event_generators"]["events"]
+    list_of_events : list[str] = yml_config["event_generators"]["events"]
     generator_basename = yml_config["event_generators"]["generator_base_name"]
 
     for index in range(1, num_of_generators + 1):
@@ -195,7 +195,7 @@ def generate_infrastructure(config_filename: str):
         )
 
         # define a probability that each event will be triggered by that device
-        events_with_probability = []
+        events_with_probability : list[(str, float)] = []
         for event in chosen_events:
             event_probability = random.uniform(
                 general_config.event_min_probability,
