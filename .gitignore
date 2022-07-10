@@ -128,16 +128,19 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# MY DEFINITIONS
+
+# Project output files
+generated_infrastructure.pl
+reports/
+
+# don't delete any file inside examples
+!examples/
+
 # macos .DS_Store files
 .DS_Store
 *.DS_Store
 */.DS_Store
 */*/.DS_Store
-
-# JSON files
-*.json
-
-# Project output files
-*infrastructure.pl
 
 # ADD HERE FILES AND FOLDERS TO BE IGNORED

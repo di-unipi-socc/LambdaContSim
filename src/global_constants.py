@@ -47,8 +47,8 @@ def init():
     SECF2F_INFRASTRUCTURE_PATH = os.path.join(secfaas2fog_path, "infrastructure.pl")
 
     # default infrastructures and applications paths
-    INFRASTRUCTURES_DIR = os.path.join(ROOT_DIR, "test_set", "infrastructures")
-    APPLICATIONS_DIR = os.path.join(ROOT_DIR, "test_set", "applications")
+    INFRASTRUCTURES_DIR = os.path.join(ROOT_DIR, "examples", "infrastructures")
+    APPLICATIONS_DIR = os.path.join(ROOT_DIR, "examples", "applications")
 
     # default config path
     DEFAULT_CONFIG_PATH = os.path.join(ROOT_DIR, "config.yaml")

@@ -19,7 +19,7 @@ git clone --recursive https://github.com/di-unipi-socc/LambdaFogSim.git
 
 Then open a terminal inside the project root folder and follow the next steps.
 
-### 2. (OPTIONAL) Enviroment setup and requirements installation
+### 2. (OPTIONAL) Enviroment setup
 
 It's recommended to setup a virtual enviroment where launch the application.
 
